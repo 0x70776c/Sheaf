@@ -476,13 +476,14 @@ pub fn execute_protect_op(
     match action {
         "protect" => {
             let opts = ProtectOptions {
-                user_password: password.to_string(),
+                user_password: secrecy::SecretString::from(password.to_string()),
                 owner_password: owner_password
                     .map(str::trim)
                     .filter(|s| !s.is_empty())
-                    .map(str::to_string),
+                    .map(|s| secrecy::SecretString::from(s.to_string())),
                 allow_print,
                 allow_copy,
+                allow_modify: true,
                 out: clean_out,
                 force,
                 dry_run: false,
@@ -491,7 +492,7 @@ pub fn execute_protect_op(
         }
         "unlock" => {
             let opts = UnlockOptions {
-                password: password.to_string(),
+                password: secrecy::SecretString::from(password.to_string()),
                 out: clean_out,
                 force,
                 dry_run: false,

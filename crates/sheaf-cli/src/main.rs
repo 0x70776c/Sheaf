@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod exit;
 mod output;
+mod password;
 mod progress;
 
 use std::process::ExitCode;

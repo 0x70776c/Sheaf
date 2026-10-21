@@ -5,6 +5,7 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use lopdf::{Document, EncryptionState, EncryptionVersion, LoadOptions, Object, Permissions};
+use secrecy::{ExposeSecret, SecretString};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -17,13 +18,15 @@ use crate::{Progress, SheafError};
 #[derive(Debug, Clone)]
 pub struct ProtectOptions {
     /// User password required to open the encrypted PDF.
-    pub user_password: String,
+    pub user_password: SecretString,
     /// Optional owner password (defaults to `user_password` when `None`).
-    pub owner_password: Option<String>,
+    pub owner_password: Option<SecretString>,
     /// Allow printing the document (`true` by default).
     pub allow_print: bool,
     /// Allow copying text and graphics (`true` by default).
     pub allow_copy: bool,
+    /// Allow modifying contents, annotations, and forms (`true` by default).
+    pub allow_modify: bool,
     /// Target output PDF path (defaults to `{stem}_protected.pdf`).
     pub out: Option<PathBuf>,
     /// Overwrite existing output file if `true`.
@@ -35,10 +38,11 @@ pub struct ProtectOptions {
 impl Default for ProtectOptions {
     fn default() -> Self {
         Self {
-            user_password: String::new(),
+            user_password: SecretString::from(""),
             owner_password: None,
             allow_print: true,
             allow_copy: true,
+            allow_modify: true,
             out: None,
             force: false,
             dry_run: false,
@@ -50,7 +54,7 @@ impl Default for ProtectOptions {
 #[derive(Debug, Clone, Default)]
 pub struct UnlockOptions {
     /// User or owner password to unlock the encrypted PDF.
-    pub password: String,
+    pub password: SecretString,
     /// Target output PDF path (defaults to `{stem}_unlocked.pdf`).
     pub out: Option<PathBuf>,
     /// Overwrite existing output file if `true`.
@@ -96,7 +100,7 @@ pub fn protect(
     opts: &ProtectOptions,
     p: &dyn Progress,
 ) -> Result<ProtectReport, SheafError> {
-    if opts.user_password.is_empty() {
+    if opts.user_password.expose_secret().is_empty() {
         return Err(SheafError::InvalidSelection(
             "Password cannot be empty".to_string(),
         ));
@@ -157,17 +161,21 @@ pub fn protect(
         if opts.allow_copy {
             perms |= Permissions::COPYABLE | Permissions::COPYABLE_FOR_ACCESSIBILITY;
         }
+        if opts.allow_modify {
+            perms |= Permissions::MODIFIABLE | Permissions::ANNOTABLE;
+        }
 
         let owner_pw = opts
             .owner_password
-            .as_deref()
+            .as_ref()
+            .map(|s| s.expose_secret())
             .filter(|s| !s.is_empty())
-            .unwrap_or(&opts.user_password);
+            .unwrap_or_else(|| opts.user_password.expose_secret());
 
         let state = EncryptionState::try_from(EncryptionVersion::V2 {
             document: &doc,
             owner_password: owner_pw,
-            user_password: &opts.user_password,
+            user_password: opts.user_password.expose_secret(),
             key_length: 128,
             permissions: perms,
         })
@@ -256,17 +264,17 @@ pub fn unlock(
         ));
     }
 
-    let mut doc =
-        Document::load_mem_with_options(&raw_bytes, LoadOptions::with_password(&opts.password))
-            .map_err(|e| match e {
-                lopdf::Error::Decryption(_) | lopdf::Error::InvalidPassword => {
-                    SheafError::WrongPassword
-                }
-                other => SheafError::from_lopdf_with_path(other, src),
-            })?;
+    let mut doc = Document::load_mem_with_options(
+        &raw_bytes,
+        LoadOptions::with_password(opts.password.expose_secret()),
+    )
+    .map_err(|e| match e {
+        lopdf::Error::Decryption(_) | lopdf::Error::InvalidPassword => SheafError::WrongPassword,
+        other => SheafError::from_lopdf_with_path(other, src),
+    })?;
 
     if doc.is_encrypted() {
-        doc.decrypt(&opts.password)
+        doc.decrypt(opts.password.expose_secret())
             .map_err(|_| SheafError::WrongPassword)?;
     }
 

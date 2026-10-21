@@ -129,10 +129,11 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let prot_rep = protect(
         &src,
         &ProtectOptions {
-            user_password: "user-pass-123".to_string(),
-            owner_password: Some("owner-pass-456".to_string()),
+            user_password: secrecy::SecretString::from("user-pass-123"),
+            owner_password: Some(secrecy::SecretString::from("owner-pass-456")),
             allow_print: true,
             allow_copy: false,
+            allow_modify: true,
             out: Some(locked_pdf.clone()),
             force: false,
             dry_run: false,
@@ -157,7 +158,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let bad_err = unlock(
         &locked_pdf,
         &UnlockOptions {
-            password: "wrong-password".to_string(),
+            password: secrecy::SecretString::from("wrong-password"),
             out: Some(bad_out.clone()),
             force: false,
             dry_run: false,
@@ -176,7 +177,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let unl_rep = unlock(
         &locked_pdf,
         &UnlockOptions {
-            password: "user-pass-123".to_string(),
+            password: secrecy::SecretString::from("user-pass-123"),
             out: Some(unlocked_pdf.clone()),
             force: false,
             dry_run: false,

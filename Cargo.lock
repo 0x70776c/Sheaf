@@ -4204,6 +4204,7 @@ name = "sheaf-desktop"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "secrecy",
  "serde",
  "serde_json",
  "sheaf-core",

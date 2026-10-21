@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
+use crate::password::{NewPasswordArgs, OpenPasswordArgs};
+
 /// Progress reporting mode on `stderr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ProgressMode {
@@ -147,6 +149,9 @@ pub struct MergeArgs {
     #[arg(required = true)]
     pub inputs: Vec<PathBuf>,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Target output PDF file
     #[arg(short, long)]
     pub out: PathBuf,
@@ -161,6 +166,9 @@ pub struct MergeArgs {
 pub struct SplitArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Page ranges to split (e.g. "1-3,5,8-")
     #[arg(long)]
@@ -221,6 +229,9 @@ pub struct PagesRotateArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Page ranges to rotate (e.g. "1-3,5"; omit to rotate all pages)
     #[arg(long)]
     pub pages: Option<String>,
@@ -239,6 +250,9 @@ pub struct PagesDeleteArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Page ranges to delete (e.g. "2,5-7")
     #[arg(long)]
     pub pages: String,
@@ -252,6 +266,9 @@ pub struct PagesDeleteArgs {
 pub struct PagesReorderArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// New page order specification (e.g. "3,1,2,4-")
     #[arg(long)]
@@ -267,6 +284,9 @@ pub struct PagesExtractArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Page ranges to extract into a new PDF (e.g. "1-3,5")
     #[arg(long)]
     pub pages: String,
@@ -280,6 +300,9 @@ pub struct PagesExtractArgs {
 pub struct RenderArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Single 1-based page number to render
     #[arg(long, conflicts_with = "pages")]
@@ -310,6 +333,9 @@ pub struct RenderArgs {
 pub struct CompressArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Compression preset: low (220 DPI, JPEG 85), medium (150 DPI, JPEG 70), or high (100 DPI, JPEG 55)
     #[arg(long, default_value = "medium")]
@@ -362,6 +388,9 @@ pub struct ConvertToImagesArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Output image format: png or jpg
     #[arg(long, default_value = "png")]
     pub format: String,
@@ -407,6 +436,9 @@ pub struct ConvertToMarkdownArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Optional 1-based page ranges to extract (omit to extract all pages)
     #[arg(long)]
     pub pages: Option<String>,
@@ -438,6 +470,9 @@ pub struct ConvertFromMarkdownArgs {
 pub struct WatermarkArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Text to stamp as a watermark
     #[arg(long)]
@@ -476,6 +511,9 @@ pub struct WatermarkArgs {
 pub struct NumberArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Page number format template supporting {n}, {total}, {page}, and {pages}
     #[arg(long, default_value = "{n} / {total}")]
@@ -531,6 +569,12 @@ pub struct ProtectArgs {
     #[arg(long, hide = true)]
     pub user_password: Option<String>,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
+    #[command(flatten)]
+    pub new_password: NewPasswordArgs,
+
     /// Disallow printing the protected PDF
     #[arg(long)]
     pub no_print: bool,
@@ -538,6 +582,10 @@ pub struct ProtectArgs {
     /// Disallow copying text and graphics from the protected PDF
     #[arg(long)]
     pub no_copy: bool,
+
+    /// Disallow modifying contents, annotations, and forms in the protected PDF
+    #[arg(long)]
+    pub no_modify: bool,
 
     /// Target output PDF file (defaults to {stem}_protected.pdf)
     #[arg(short, long)]
@@ -557,6 +605,9 @@ pub struct UnlockArgs {
     #[arg(long, hide = true)]
     pub user_password: Option<String>,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Target output PDF file (defaults to {stem}_unlocked.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
@@ -567,6 +618,9 @@ pub struct InfoArgs {
     /// PDF files to inspect
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -574,6 +628,9 @@ pub struct VerifyArgs {
     /// PDF files to verify
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Also run qpdf --check if installed
     #[arg(long)]

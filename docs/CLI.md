@@ -42,6 +42,9 @@ Merge multiple PDF files into a single output PDF
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<inputs>` | `<INPUTS>` | Yes | Input PDF files in the desired merge order |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `-o, --out` | `<OUT>` | Yes | Target output PDF file |
 
 ### Examples
@@ -60,6 +63,9 @@ Split a PDF file by page ranges, fixed chunks, or bookmark levels
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `--ranges` | `<RANGES>` | No | Page ranges to split (e.g. "1-3,5,8-") |
 | `--every` | `<EVERY>` | No | Split every N pages |
 | `--bookmarks-level` | `<BOOKMARKS_LEVEL>` | No | Split by bookmarks at hierarchy level N (1 = top level) |
@@ -101,6 +107,9 @@ Render PDF pages to PNG images or thumbnails
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `--page` | `<PAGE>` | No | Single 1-based page number to render |
 | `--pages` | `<PAGES>` | No | Page ranges to render (e.g. "1-3,5,8-"; omit both --page and --pages to render all pages) |
 | `--dpi` | `<DPI>` | No | Target resolution in dots per inch (default: 150 DPI if --width is not set) |
@@ -124,6 +133,9 @@ Compress a PDF file by optimizing streams, deduplicating objects, and resampling
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `--preset` | `<PRESET>` | No | Compression preset: low (220 DPI, JPEG 85), medium (150 DPI, JPEG 70), or high (100 DPI, JPEG 55) |
 | `--grayscale` | `<GRAYSCALE>` | No | Convert embedded images to grayscale |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_compressed.pdf) |
@@ -162,6 +174,9 @@ Add a customizable text watermark to PDF pages
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `--text` | `<TEXT>` | Yes | Text to stamp as a watermark |
 | `--position` | `<POSITION>` | No | Watermark placement: diagonal, center, top-left, top-right, bottom-left, or bottom-right |
 | `--font-size` | `<FONT_SIZE>` | No | Font size in PDF points (6..=300) |
@@ -187,6 +202,9 @@ Stamp customizable page numbers onto PDF pages
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `--format` | `<FORMAT>` | No | Page number format template supporting {n}, {total}, {page}, and {pages} |
 | `--position` | `<POSITION>` | No | Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left |
 | `--start` | `<START>` | No | Starting sequence number for {n} on the first selected page |
@@ -213,8 +231,17 @@ Password-protect (encrypt) a PDF file
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--new-password-env` | `<NEW_PASSWORD_ENV>` | No | Read the new user password from an environment variable |
+| `--new-password-file` | `<NEW_PASSWORD_FILE>` | No | Read the new user password from a file |
+| `--new-password-stdin` | `<NEW_PASSWORD_STDIN>` | No | Read the new user password from standard input |
+| `--new-owner-password-env` | `<NEW_OWNER_PASSWORD_ENV>` | No | Read the optional new owner password from an environment variable |
+| `--new-owner-password-file` | `<NEW_OWNER_PASSWORD_FILE>` | No | Read the optional new owner password from a file |
 | `--no-print` | `<NO_PRINT>` | No | Disallow printing the protected PDF |
 | `--no-copy` | `<NO_COPY>` | No | Disallow copying text and graphics from the protected PDF |
+| `--no-modify` | `<NO_MODIFY>` | No | Disallow modifying contents, annotations, and forms in the protected PDF |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_protected.pdf) |
 
 ### Examples
@@ -233,6 +260,9 @@ Remove password protection (decrypt) from an encrypted PDF file
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Encrypted input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_unlocked.pdf) |
 
 ### Examples
@@ -251,6 +281,9 @@ Inspect structural properties and metadata of PDF files
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<files>` | `<FILES>` | Yes | PDF files to inspect |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 
 ### Examples
 
@@ -268,6 +301,9 @@ Verify PDF files for structural integrity
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<files>` | `<FILES>` | Yes | PDF files to verify |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
 | `--deep` | `<DEEP>` | No | Also run qpdf --check if installed |
 
 ### Examples

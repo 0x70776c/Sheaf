@@ -13,6 +13,24 @@ expression: cap_val
             "value_name": "INPUTS"
           },
           {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
+          },
+          {
             "long": "out",
             "required": true,
             "secret": false,
@@ -28,6 +46,24 @@ expression: cap_val
             "required": true,
             "secret": false,
             "value_name": "INPUT"
+          },
+          {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
           },
           {
             "long": "ranges",
@@ -74,6 +110,24 @@ expression: cap_val
             "required": true,
             "secret": false,
             "value_name": "INPUT"
+          },
+          {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
           },
           {
             "long": "page",
@@ -123,6 +177,24 @@ expression: cap_val
             "value_name": "INPUT"
           },
           {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
+          },
+          {
             "long": "preset",
             "required": false,
             "secret": false,
@@ -155,6 +227,24 @@ expression: cap_val
             "required": true,
             "secret": false,
             "value_name": "INPUT"
+          },
+          {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
           },
           {
             "long": "text",
@@ -214,6 +304,24 @@ expression: cap_val
             "required": true,
             "secret": false,
             "value_name": "INPUT"
+          },
+          {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
           },
           {
             "long": "format",
@@ -281,6 +389,54 @@ expression: cap_val
             "value_name": "INPUT"
           },
           {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
+          },
+          {
+            "long": "new-password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "NEW_PASSWORD_ENV"
+          },
+          {
+            "long": "new-password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "NEW_PASSWORD_FILE"
+          },
+          {
+            "long": "new-password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "NEW_PASSWORD_STDIN"
+          },
+          {
+            "long": "new-owner-password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "NEW_OWNER_PASSWORD_ENV"
+          },
+          {
+            "long": "new-owner-password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "NEW_OWNER_PASSWORD_FILE"
+          },
+          {
             "long": "no-print",
             "required": false,
             "secret": false,
@@ -291,6 +447,12 @@ expression: cap_val
             "required": false,
             "secret": false,
             "value_name": "NO_COPY"
+          },
+          {
+            "long": "no-modify",
+            "required": false,
+            "secret": false,
+            "value_name": "NO_MODIFY"
           },
           {
             "long": "out",
@@ -310,6 +472,24 @@ expression: cap_val
             "value_name": "INPUT"
           },
           {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
+          },
+          {
             "long": "out",
             "required": false,
             "secret": false,
@@ -325,6 +505,24 @@ expression: cap_val
             "required": true,
             "secret": false,
             "value_name": "FILES"
+          },
+          {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
           }
         ],
         "name": "info",
@@ -336,6 +534,24 @@ expression: cap_val
             "required": true,
             "secret": false,
             "value_name": "FILES"
+          },
+          {
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "long": "password-stdin",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_STDIN"
           },
           {
             "long": "deep",

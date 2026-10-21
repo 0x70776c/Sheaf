@@ -2,6 +2,7 @@ use sheaf_core::{ProtectOptions, ProtectReport, SheafError, UnlockOptions, prote
 
 use crate::cli::{ProtectArgs, UnlockArgs};
 use crate::commands::{Command, Ctx, Outcome};
+use crate::password::PasswordResolver;
 
 impl Command for ProtectArgs {
     type Report = ProtectReport;
@@ -22,12 +23,16 @@ impl Command for ProtectArgs {
             ));
         }
 
-        let user_password = self.password.clone().unwrap_or_default();
+        let mut resolver = PasswordResolver::new();
+        let user_password = resolver.resolve_new_user_password(&self.new_password)?;
+        let owner_password = resolver.resolve_new_owner_password(&self.new_password)?;
+
         let opts = ProtectOptions {
             user_password,
-            owner_password: self.owner_password.clone(),
+            owner_password,
             allow_print: !self.no_print,
             allow_copy: !self.no_copy,
+            allow_modify: !self.no_modify,
             out: self.out.clone(),
             force: ctx.global.force,
             dry_run: ctx.global.dry_run,
@@ -36,7 +41,7 @@ impl Command for ProtectArgs {
 
         Ok(Outcome {
             report,
-            warnings: Vec::new(),
+            warnings: resolver.warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })
@@ -71,7 +76,15 @@ impl Command for UnlockArgs {
             ));
         }
 
-        let password = self.password.clone().unwrap_or_default();
+        let mut resolver = PasswordResolver::new();
+        let password = resolver
+            .resolve_open_password(&self.password_opts)?
+            .ok_or_else(|| {
+                SheafError::InvalidSelection(
+                    "Missing required password. Specify --password-env VAR, --password-file PATH, or --password-stdin.".to_string(),
+                )
+            })?;
+
         let opts = UnlockOptions {
             password,
             out: self.out.clone(),
@@ -82,7 +95,7 @@ impl Command for UnlockArgs {
 
         Ok(Outcome {
             report,
-            warnings: Vec::new(),
+            warnings: resolver.warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })
