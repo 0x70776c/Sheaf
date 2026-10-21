@@ -21,12 +21,24 @@ export interface PdfMetadataInfo {
   producer: string | null;
 }
 
+export interface EncryptionInfoUi {
+  algorithm: string;
+  key_bits: number;
+  revision: number;
+  permissions: {
+    print: boolean;
+    copy: boolean;
+    modify: boolean;
+  };
+}
+
 export interface FileInfo {
   path: string;
   size_bytes: number;
   pdf_version: string | null;
   pages: number | null;
   encrypted: boolean;
+  encryption?: EncryptionInfoUi | null;
   metadata: PdfMetadataInfo;
   has_outlines: boolean;
   outline_count: number;

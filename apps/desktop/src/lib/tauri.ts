@@ -88,19 +88,21 @@ export async function pickSaveMarkdownPath(defaultName: string): Promise<string 
   });
 }
 
-export async function openPdf(paths: string[]): Promise<InfoReport> {
-  return await invoke<InfoReport>('open_pdf', { paths });
+export async function openPdf(paths: string[], password?: string | null): Promise<InfoReport> {
+  return await invoke<InfoReport>('open_pdf', { paths, password: password ?? null });
 }
 
 export async function fetchThumbnails(
   path: string,
   pages: number[],
   widthPx = 160,
+  password?: string | null,
 ): Promise<ThumbnailItem[]> {
   return await invoke<ThumbnailItem[]>('thumbnails', {
     path,
     pages,
     widthPx,
+    password: password ?? null,
   });
 }
 
@@ -309,6 +311,7 @@ export interface RunProtectParams {
   ownerPassword?: string | null;
   allowPrint?: boolean;
   allowCopy?: boolean;
+  allowModify?: boolean;
   out?: string | null;
   force?: boolean;
 }
@@ -321,6 +324,7 @@ export async function runProtectCommand(params: RunProtectParams): Promise<Prote
     ownerPassword: params.ownerPassword ?? null,
     allowPrint: params.allowPrint ?? true,
     allowCopy: params.allowCopy ?? true,
+    allowModify: params.allowModify ?? true,
     out: params.out ?? null,
     force: params.force ?? true,
   });

@@ -21,7 +21,7 @@ use sheaf_core::{
     SplitMode, SplitOptions, SplitReport, UnlockOptions, WatermarkOptions, WatermarkPosition,
     WatermarkReport, capabilities, compress_with_options, delete_pages, extract_pages,
     format_page_number, images_to_pdf, info, markdown_to_pdf, merge_with_options, number,
-    pdf_to_images, pdf_to_markdown, preview_overlay_page, protect, render_thumbnails,
+    pdf_to_images, pdf_to_markdown, preview_overlay_page, protect, render_thumbnails_with_options,
     reorder_pages, rotate_pages, split, unlock, watermark,
 };
 use tauri::{AppHandle, Emitter, State};
@@ -473,6 +473,7 @@ pub fn execute_protect_op(
     owner_password: Option<&str>,
     allow_print: bool,
     allow_copy: bool,
+    allow_modify: bool,
     out: Option<&Path>,
     force: bool,
     progress: &dyn Progress,
@@ -492,7 +493,7 @@ pub fn execute_protect_op(
                     .map(|s| secrecy::SecretString::from(s.to_string())),
                 allow_print,
                 allow_copy,
-                allow_modify: true,
+                allow_modify,
                 out: clean_out,
                 force,
                 dry_run: false,
@@ -516,19 +517,35 @@ pub fn execute_protect_op(
 
 /// Inspects one or more local PDF files and returns their [`InfoReport`].
 #[tauri::command]
-async fn open_pdf(paths: Vec<String>) -> Result<InfoReport, CommandError> {
+async fn open_pdf(
+    paths: Vec<String>,
+    password: Option<String>,
+) -> Result<InfoReport, CommandError> {
     let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
-    let res = tauri::async_runtime::spawn_blocking(move || info(&path_bufs, &NoProgress))
-        .await
-        .map_err(|e| CommandError {
-            code: "internal",
-            message: format!("Worker thread failed: {e}"),
-            hint: None,
-        })?;
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(ref pw) = password
+            && !pw.is_empty()
+        {
+            for path in &path_bufs {
+                let load_opts = LoadOptions {
+                    password: Some(secrecy::SecretString::from(pw.clone())),
+                };
+                sheaf_core::load_pdf(path, &load_opts)?;
+            }
+        }
+        info(&path_bufs, &NoProgress)
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
     res.map_err(CommandError::from)
 }
 
-/// Renders page thumbnails on a worker thread, utilizing the on-disk thumbnail cache.
+/// Renders page thumbnails on a worker thread, utilizing the on-disk thumbnail cache
+/// for unencrypted PDFs, and RAM-only in-memory rendering for encrypted PDFs.
 #[tauri::command]
 async fn thumbnails(
     app: AppHandle,
@@ -536,6 +553,7 @@ async fn thumbnails(
     path: String,
     pages: Vec<u32>,
     width_px: Option<u32>,
+    password: Option<String>,
 ) -> Result<Vec<ThumbnailItem>, CommandError> {
     state.cancelled.store(false, Ordering::SeqCst);
     let cancelled = Arc::clone(&state.cancelled);
@@ -549,7 +567,19 @@ async fn thumbnails(
                 op: "thumbnails",
                 cancelled,
             };
-            let pngs = render_thumbnails(&src_path, &pages, target_width, None, &progress)?;
+            let load_opts = LoadOptions {
+                password: password
+                    .filter(|p| !p.is_empty())
+                    .map(secrecy::SecretString::from),
+            };
+            let pngs = render_thumbnails_with_options(
+                &src_path,
+                &pages,
+                target_width,
+                None,
+                &load_opts,
+                &progress,
+            )?;
             let mut items = Vec::with_capacity(pngs.len());
             for (&page, bytes) in pages.iter().zip(pngs) {
                 let (w, h) = parse_png_dimensions(&bytes);
@@ -969,6 +999,7 @@ async fn run_protect(
     owner_password: Option<String>,
     allow_print: bool,
     allow_copy: bool,
+    allow_modify: bool,
     out: Option<String>,
     force: bool,
 ) -> Result<ProtectReport, CommandError> {
@@ -990,6 +1021,7 @@ async fn run_protect(
             owner_password.as_deref(),
             allow_print,
             allow_copy,
+            allow_modify,
             out_path.as_deref(),
             force,
             &progress,
@@ -1265,5 +1297,42 @@ mod tests {
             &cancel_progress,
         );
         assert!(matches!(cancel_res, Err(SheafError::Cancelled)));
+
+        // 6. Protect and Unlock operation end-to-end
+        let prot_out = temp.path().join("ui_protected.pdf");
+        let prot_rep = execute_protect_op(
+            "protect",
+            &f3,
+            "secret123",
+            Some("owner456"),
+            true,
+            true,
+            true,
+            Some(&prot_out),
+            true,
+            &NoProgress,
+        )
+        .unwrap_or_else(|_| std::process::abort());
+        assert_eq!(prot_rep.action, "protect");
+        assert_eq!(prot_rep.pages, 3);
+        assert!(prot_out.exists());
+
+        let unlock_out = temp.path().join("ui_unlocked.pdf");
+        let unlock_rep = execute_protect_op(
+            "unlock",
+            &prot_out,
+            "secret123",
+            None,
+            true,
+            true,
+            true,
+            Some(&unlock_out),
+            true,
+            &NoProgress,
+        )
+        .unwrap_or_else(|_| std::process::abort());
+        assert_eq!(unlock_rep.action, "unlock");
+        assert_eq!(unlock_rep.pages, 3);
+        assert!(unlock_out.exists());
     }
 }
