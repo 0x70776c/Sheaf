@@ -29,7 +29,7 @@ pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
 pub use ops::number::{NumberOptions, NumberPosition, NumberReport, format_page_number, number};
 pub use ops::overlay::{
     OverlayPosition, PageBox, PageOverlaySpec, apply_overlay_to_page, encode_win_ansi,
-    get_effective_page_box, parse_overlay_color,
+    get_effective_page_box, parse_overlay_color, preview_overlay_page,
 };
 pub use ops::pages::{
     PageOpOptions, PagesReport, delete_pages, extract_pages, get_effective_page_rotation,
@@ -39,7 +39,7 @@ pub use ops::protect::{ProtectOptions, ProtectReport, UnlockOptions, protect, un
 pub use ops::render::{
     DEFAULT_RENDER_DPI, DEFAULT_THUMBNAIL_WIDTH_PX, RenderOptions, RenderReport, RenderScale,
     RenderedPageOutput, default_thumbnail_cache_dir, is_pdfium_available, render_page,
-    render_thumbnails, render_with_options, thumbnail_cache_key,
+    render_pdf_bytes_page, render_thumbnails, render_with_options, thumbnail_cache_key,
 };
 pub use ops::split::{PageSelection, SplitMode, SplitOptions, SplitOutput, SplitReport, split};
 pub use ops::verify::{VerifyFileResult, VerifyOptions, VerifyReport, verify};

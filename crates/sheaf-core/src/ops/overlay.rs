@@ -7,6 +7,8 @@
 //! - Page geometry resolution (`CropBox` / `MediaBox` offsets and `/Rotate` `0`/`90`/`180`/`270`).
 //! - Strict `WinAnsiEncoding` validation returning [`SheafError::Unsupported`] with a hint on non-WinAnsi characters.
 
+use std::path::Path;
+
 use lopdf::content::{Content, Operation};
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream, StringFormat, dictionary};
 use serde::{Deserialize, Serialize};
@@ -671,4 +673,88 @@ fn wrap_and_append_page_contents(
     }
 
     Ok(())
+}
+
+/// Applies an overlay to a single 1-based `page` of `src` strictly in memory and renders it to PNG bytes
+/// at `width_px` width for live UI previews.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use sheaf_core::ops::overlay::{OverlayPosition, preview_overlay_page};
+///
+/// let png = preview_overlay_page(
+///     Path::new("input.pdf"),
+///     1,
+///     "DRAFT",
+///     OverlayPosition::Diagonal,
+///     48.0,
+///     0.25,
+///     45.0,
+///     "#6B7280",
+///     36.0,
+///     true,
+///     240,
+/// ).unwrap();
+/// assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn preview_overlay_page(
+    src: &Path,
+    page: u32,
+    text: &str,
+    position: OverlayPosition,
+    font_size: f32,
+    opacity: f32,
+    rotation_deg: f32,
+    color: &str,
+    margin: f32,
+    bold: bool,
+    width_px: u32,
+) -> Result<Vec<u8>, SheafError> {
+    let clean_text = text.trim();
+    if clean_text.is_empty() {
+        return crate::ops::render::render_page(src, page, width_px);
+    }
+    let _ = encode_win_ansi(clean_text)?;
+    let (rgb, _) = parse_overlay_color(color)?;
+
+    let raw_bytes = std::fs::read(src)?;
+    let mut doc = Document::load_mem(&raw_bytes).map_err(|e| {
+        let msg = e.to_string();
+        if msg.to_ascii_lowercase().contains("encrypt") {
+            SheafError::Encrypted
+        } else {
+            SheafError::InvalidPdf(format!("{}: {msg}", src.display()))
+        }
+    })?;
+
+    if doc.is_encrypted() || doc.trailer.get(b"Encrypt").is_ok() {
+        return Err(SheafError::Encrypted);
+    }
+
+    let pages_map = doc.get_pages();
+    let total = pages_map.len() as u32;
+    let &page_id = pages_map
+        .get(&page)
+        .ok_or(SheafError::PageOutOfRange { page, total })?;
+
+    let base_font = if bold { "Helvetica-Bold" } else { "Helvetica" };
+    let (font_id, gs_id) = create_overlay_shared_objects(&mut doc, base_font, opacity);
+    let spec = PageOverlaySpec {
+        text: clean_text,
+        position,
+        font_size: font_size.clamp(6.0, 300.0),
+        rotation_deg,
+        rgb,
+        margin: margin.clamp(0.0, 200.0),
+    };
+    apply_overlay_to_page(&mut doc, page_id, font_id, gs_id, bold, &spec)?;
+
+    let mut pdf_buf = Vec::new();
+    doc.save_to(&mut pdf_buf)
+        .map_err(|e| SheafError::InvalidPdf(format!("Failed to serialize preview PDF: {e}")))?;
+
+    crate::ops::render::render_pdf_bytes_page(&pdf_buf, page, width_px)
 }

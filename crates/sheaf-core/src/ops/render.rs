@@ -352,6 +352,50 @@ pub fn render_page(src: &Path, page: u32, width_px: u32) -> Result<Vec<u8>, Shea
     Ok(png_bytes)
 }
 
+/// Renders a 1-based page from in-memory PDF bytes to PNG bytes at `width_px` target width.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sheaf_core::ops::render::render_pdf_bytes_page;
+///
+/// let bytes = std::fs::read("document.pdf").unwrap();
+/// let png = render_pdf_bytes_page(&bytes, 1, 200).unwrap();
+/// assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+/// ```
+pub fn render_pdf_bytes_page(
+    pdf_bytes: &[u8],
+    page: u32,
+    width_px: u32,
+) -> Result<Vec<u8>, SheafError> {
+    let target_width = validate_width_px(width_px)?;
+    let pdfium = get_pdfium()?;
+    let dummy_path = Path::new("<memory>");
+    let doc = pdfium
+        .load_pdf_from_byte_slice(pdf_bytes, None)
+        .map_err(|e| map_pdfium_error(e, dummy_path))?;
+
+    let total = u32::try_from(doc.pages().len()).unwrap_or(0);
+    if page == 0 || page > total {
+        return Err(SheafError::PageOutOfRange { page, total });
+    }
+
+    let page_index =
+        i32::try_from(page - 1).map_err(|_| SheafError::PageOutOfRange { page, total })?;
+    let pdf_page = doc
+        .pages()
+        .get(page_index)
+        .map_err(|e| map_pdfium_error(e, dummy_path))?;
+
+    let config = PdfRenderConfig::new().set_target_width(target_width);
+    let bitmap = pdf_page
+        .render_with_config(&config)
+        .map_err(|e| map_pdfium_error(e, dummy_path))?;
+
+    let (png_bytes, _, _) = encode_bitmap_to_png(&bitmap)?;
+    Ok(png_bytes)
+}
+
 /// Renders a batch of 1-based pages as thumbnails (default `160` px width), utilizing an on-disk
 /// PNG cache keyed by `(path, mtime, size, page, width_px)`.
 ///

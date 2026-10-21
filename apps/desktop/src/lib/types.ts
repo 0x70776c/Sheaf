@@ -144,6 +144,8 @@ export type ConvertReport =
   | PdfToMarkdownReport
   | MarkdownToPdfReport;
 
+export type OverlayModeUi = 'watermark' | 'number';
+
 export type WatermarkPositionUi =
   | 'diagonal'
   | 'center'
@@ -151,6 +153,14 @@ export type WatermarkPositionUi =
   | 'top-right'
   | 'bottom-left'
   | 'bottom-right';
+
+export type NumberPositionUi =
+  | 'bottom-center'
+  | 'bottom-right'
+  | 'bottom-left'
+  | 'top-center'
+  | 'top-right'
+  | 'top-left';
 
 export interface WatermarkReport {
   input: string;
@@ -163,6 +173,20 @@ export interface WatermarkReport {
   color: string;
   total_pages: number;
   pages_watermarked: number[];
+  dry_run: boolean;
+}
+
+export interface NumberReport {
+  input: string;
+  output: string;
+  format: string;
+  position: string;
+  start: number;
+  font_size: number;
+  opacity: number;
+  color: string;
+  total_pages: number;
+  pages_numbered: number[];
   dry_run: boolean;
 }
 

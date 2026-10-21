@@ -39,10 +39,12 @@
     runCompressCommand,
     runConvertCommand,
     runMergeCommand,
+    runNumberCommand,
     runPagesCommand,
     runProtectCommand,
     runSplitCommand,
     runWatermarkCommand,
+    previewOverlayCommand,
   } from './lib/tauri';
   import type {
     CommandErrorPayload,
@@ -51,6 +53,8 @@
     ConvertPageSizeUi,
     FileInfo,
     ImageFormatUi,
+    NumberPositionUi,
+    OverlayModeUi,
     PagesActionUi,
     ProgressEventPayload,
     ProtectActionUi,
@@ -106,7 +110,8 @@
   let convertImagePaths = $state<string[]>([]);
   let convertMarkdownPath = $state<string | null>(null);
 
-  // Watermark options
+  // Watermark & Number (Overlay) options
+  let overlayMode = $state<OverlayModeUi>('watermark');
   let watermarkText = $state('CONFIDENTIAL');
   let watermarkPosition = $state<WatermarkPositionUi>('diagonal');
   let watermarkFontSize = $state<number>(48);
@@ -114,6 +119,23 @@
   let watermarkColor = $state('#6B7280');
   let watermarkPagesSpec = $state('');
   let watermarkOutPath = $state<string | null>(null);
+
+  // Number options
+  let numberFormat = $state('{n} / {total}');
+  let numberPosition = $state<NumberPositionUi>('bottom-center');
+  let numberStart = $state<number>(1);
+  let numberFontSize = $state<number>(11);
+  let numberOpacity = $state<number>(1.0);
+  let numberColor = $state('#111827');
+  let numberMargin = $state<number>(28);
+  let numberPagesSpec = $state('');
+  let numberOutPath = $state<string | null>(null);
+
+  // Overlay Live Preview state
+  let overlayPreviewItem = $state<ThumbnailItem | null>(null);
+  let overlayPreviewLoading = $state(false);
+  let overlayPreviewError = $state<string | null>(null);
+  let previewReqSeq = 0;
 
   // Protect options
   let protectAction = $state<ProtectActionUi>('protect');
@@ -145,6 +167,66 @@
     } else {
       root.setAttribute('data-theme', theme);
     }
+  });
+
+  $effect(() => {
+    if (activeTool !== 'watermark' || !primaryFile || primaryFile.encrypted) {
+      overlayPreviewItem = null;
+      return;
+    }
+    const currentFile = primaryFile.path;
+    const total = primaryTotalPages;
+    const currentMode = overlayMode;
+    const wmText = watermarkText;
+    const wmPos = watermarkPosition;
+    const wmSize = watermarkFontSize;
+    const wmOp = watermarkOpacity;
+    const wmCol = watermarkColor;
+    const numFmt = numberFormat;
+    const numPos = numberPosition;
+    const numStart = numberStart;
+    const numSize = numberFontSize;
+    const numOp = numberOpacity;
+    const numCol = numberColor;
+    const numMargin = numberMargin;
+
+    const targetPage = selectedPages.size > 0 ? Math.min(...selectedPages) : 1;
+
+    const reqId = ++previewReqSeq;
+    overlayPreviewLoading = true;
+    overlayPreviewError = null;
+
+    const timer = setTimeout(async () => {
+      try {
+        const item = await previewOverlayCommand({
+          input: currentFile,
+          page: targetPage,
+          totalPages: total,
+          mode: currentMode,
+          text: currentMode === 'number' ? numFmt : wmText,
+          position: currentMode === 'number' ? numPos : wmPos,
+          start: numStart,
+          fontSize: currentMode === 'number' ? numSize : wmSize,
+          opacity: currentMode === 'number' ? numOp : wmOp,
+          color: currentMode === 'number' ? numCol : wmCol,
+          margin: currentMode === 'number' ? numMargin : 36.0,
+          widthPx: 260,
+        });
+        if (reqId === previewReqSeq) {
+          overlayPreviewItem = item;
+          overlayPreviewLoading = false;
+        }
+      } catch (err) {
+        if (reqId === previewReqSeq) {
+          overlayPreviewError = (err as Error)?.message ?? 'Preview unavailable';
+          overlayPreviewLoading = false;
+        }
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+    };
   });
 
   async function loadThumbnailsUpTo(file: FileInfo, maxPage: number) {
@@ -289,13 +371,17 @@
     ) {
       convertPagesSpec = formatted;
     } else if (activeTool === 'watermark') {
-      watermarkPagesSpec = formatted;
+      if (overlayMode === 'number') {
+        numberPagesSpec = formatted;
+      } else {
+        watermarkPagesSpec = formatted;
+      }
     }
   }
 
   function handleRangesInputEdit(
     value: string,
-    target: 'split' | 'pages' | 'convert' | 'watermark',
+    target: 'split' | 'pages' | 'convert' | 'watermark' | 'number',
   ) {
     if (target === 'split') {
       splitRangesInput = value;
@@ -303,6 +389,8 @@
       pagesSpecInput = value;
     } else if (target === 'convert') {
       convertPagesSpec = value;
+    } else if (target === 'number') {
+      numberPagesSpec = value;
     } else {
       watermarkPagesSpec = value;
     }
@@ -462,22 +550,43 @@
           };
         }
       } else if (activeTool === 'watermark' && primaryFile) {
-        const rep = await runWatermarkCommand({
-          input: primaryFile.path,
-          text: watermarkText,
-          position: watermarkPosition,
-          fontSize: watermarkFontSize,
-          opacity: watermarkOpacity,
-          color: watermarkColor,
-          pages: watermarkPagesSpec.trim() || null,
-          out: watermarkOutPath,
-          force: true,
-        });
-        toastNotice = {
-          title: `Watermarked ${rep.pages_watermarked.length} ${rep.pages_watermarked.length === 1 ? 'page' : 'pages'}`,
-          subtitle: basename(rep.output),
-          targetPath: rep.output,
-        };
+        if (overlayMode === 'number') {
+          const rep = await runNumberCommand({
+            input: primaryFile.path,
+            format: numberFormat,
+            position: numberPosition,
+            start: numberStart,
+            fontSize: numberFontSize,
+            opacity: numberOpacity,
+            color: numberColor,
+            margin: numberMargin,
+            pages: numberPagesSpec.trim() || null,
+            out: numberOutPath,
+            force: true,
+          });
+          toastNotice = {
+            title: `Numbered ${rep.pages_numbered.length} ${rep.pages_numbered.length === 1 ? 'page' : 'pages'}`,
+            subtitle: basename(rep.output),
+            targetPath: rep.output,
+          };
+        } else {
+          const rep = await runWatermarkCommand({
+            input: primaryFile.path,
+            text: watermarkText,
+            position: watermarkPosition,
+            fontSize: watermarkFontSize,
+            opacity: watermarkOpacity,
+            color: watermarkColor,
+            pages: watermarkPagesSpec.trim() || null,
+            out: watermarkOutPath,
+            force: true,
+          });
+          toastNotice = {
+            title: `Watermarked ${rep.pages_watermarked.length} ${rep.pages_watermarked.length === 1 ? 'page' : 'pages'}`,
+            subtitle: basename(rep.output),
+            targetPath: rep.output,
+          };
+        }
       } else if (activeTool === 'protect' && primaryFile) {
         const rep = await runProtectCommand({
           action: protectAction,
@@ -1297,111 +1406,288 @@
                 {/if}
               {:else if activeTool === 'watermark' && primaryFile}
                 <div class="option-group">
-                  <label class="field-label" for="watermark-text-input">
-                    Watermark Text
-                  </label>
-                  <input
-                    id="watermark-text-input"
-                    type="text"
-                    class="text-input"
-                    value={watermarkText}
-                    oninput={(e) => {
-                      watermarkText = e.currentTarget.value;
-                    }}
-                    placeholder="CONFIDENTIAL"
-                  />
-                </div>
-
-                <div class="option-group">
-                  <label class="field-label" for="watermark-pos-select">
-                    Placement
-                  </label>
-                  <select
-                    id="watermark-pos-select"
-                    class="text-input"
-                    value={watermarkPosition}
-                    onchange={(e) => {
-                      watermarkPosition = e.currentTarget.value as WatermarkPositionUi;
-                    }}
-                  >
-                    <option value="diagonal">Diagonal (45°)</option>
-                    <option value="center">Center (Horizontal)</option>
-                    <option value="top-left">Top Left</option>
-                    <option value="top-right">Top Right</option>
-                    <option value="bottom-left">Bottom Left</option>
-                    <option value="bottom-right">Bottom Right</option>
-                  </select>
-                </div>
-
-                <div class="option-group">
-                  <label class="field-label" for="watermark-size-range">
-                    Font Size ({watermarkFontSize} pt)
-                  </label>
-                  <input
-                    id="watermark-size-range"
-                    type="range"
-                    min="14"
-                    max="120"
-                    step="2"
-                    value={watermarkFontSize}
-                    oninput={(e) => {
-                      watermarkFontSize = Number(e.currentTarget.value) || 48;
-                    }}
-                  />
-                </div>
-
-                <div class="option-group">
-                  <label class="field-label" for="watermark-opacity-range">
-                    Opacity ({Math.round(watermarkOpacity * 100)}%)
-                  </label>
-                  <input
-                    id="watermark-opacity-range"
-                    type="range"
-                    min="0.05"
-                    max="0.9"
-                    step="0.05"
-                    value={watermarkOpacity}
-                    oninput={(e) => {
-                      watermarkOpacity = Number(e.currentTarget.value) || 0.25;
-                    }}
-                  />
-                </div>
-
-                <div class="option-group">
-                  <span class="field-label">Color</span>
-                  <div class="segmented-control">
-                    {#each [
-                      { label: 'Gray', hex: '#6B7280' },
-                      { label: 'Red', hex: '#DC2626' },
-                      { label: 'Blue', hex: '#2563EB' },
-                    ] as c (c.hex)}
-                      <button
-                        type="button"
-                        class="seg-btn"
-                        class:active={watermarkColor === c.hex}
-                        onclick={() => {
-                          watermarkColor = c.hex;
-                        }}
-                      >
-                        {c.label}
-                      </button>
-                    {/each}
+                  <span class="field-label">Overlay Type</span>
+                  <div class="segmented-control" role="radiogroup" aria-label="Overlay Type">
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={overlayMode === 'watermark'}
+                      onclick={() => {
+                        overlayMode = 'watermark';
+                      }}
+                    >
+                      Watermark
+                    </button>
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={overlayMode === 'number'}
+                      onclick={() => {
+                        overlayMode = 'number';
+                      }}
+                    >
+                      Page Numbers
+                    </button>
                   </div>
                 </div>
 
-                <div class="option-group">
-                  <label class="field-label" for="watermark-pages-input">
-                    Target Pages (empty = all pages)
-                  </label>
-                  <input
-                    id="watermark-pages-input"
-                    type="text"
-                    class="text-input"
-                    value={watermarkPagesSpec}
-                    oninput={(e) =>
-                      handleRangesInputEdit(e.currentTarget.value, 'watermark')}
-                    placeholder="All pages"
-                  />
+                {#if overlayMode === 'watermark'}
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-text-input">
+                      Watermark Text
+                    </label>
+                    <input
+                      id="watermark-text-input"
+                      type="text"
+                      class="text-input"
+                      value={watermarkText}
+                      oninput={(e) => {
+                        watermarkText = e.currentTarget.value;
+                      }}
+                      placeholder="CONFIDENTIAL"
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-pos-select">
+                      Placement
+                    </label>
+                    <select
+                      id="watermark-pos-select"
+                      class="text-input"
+                      value={watermarkPosition}
+                      onchange={(e) => {
+                        watermarkPosition = e.currentTarget.value as WatermarkPositionUi;
+                      }}
+                    >
+                      <option value="diagonal">Diagonal (45°)</option>
+                      <option value="center">Center (Horizontal)</option>
+                      <option value="top-left">Top Left</option>
+                      <option value="top-right">Top Right</option>
+                      <option value="bottom-left">Bottom Left</option>
+                      <option value="bottom-right">Bottom Right</option>
+                    </select>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-size-range">
+                      Font Size ({watermarkFontSize} pt)
+                    </label>
+                    <input
+                      id="watermark-size-range"
+                      type="range"
+                      min="14"
+                      max="120"
+                      step="2"
+                      value={watermarkFontSize}
+                      oninput={(e) => {
+                        watermarkFontSize = Number(e.currentTarget.value) || 48;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-opacity-range">
+                      Opacity ({Math.round(watermarkOpacity * 100)}%)
+                    </label>
+                    <input
+                      id="watermark-opacity-range"
+                      type="range"
+                      min="0.05"
+                      max="0.9"
+                      step="0.05"
+                      value={watermarkOpacity}
+                      oninput={(e) => {
+                        watermarkOpacity = Number(e.currentTarget.value) || 0.25;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Color</span>
+                    <div class="segmented-control">
+                      {#each [
+                        { label: 'Gray', hex: '#6B7280' },
+                        { label: 'Red', hex: '#DC2626' },
+                        { label: 'Blue', hex: '#2563EB' },
+                      ] as c (c.hex)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={watermarkColor === c.hex}
+                          onclick={() => {
+                            watermarkColor = c.hex;
+                          }}
+                        >
+                          {c.label}
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-pages-input">
+                      Target Pages (empty = all pages)
+                    </label>
+                    <input
+                      id="watermark-pages-input"
+                      type="text"
+                      class="text-input"
+                      value={watermarkPagesSpec}
+                      oninput={(e) =>
+                        handleRangesInputEdit(e.currentTarget.value, 'watermark')}
+                      placeholder="All pages"
+                    />
+                  </div>
+                {:else}
+                  <div class="option-group">
+                    <label class="field-label" for="number-format-input">
+                      Format ({'{n}'}, {'{total}'}, {'{page}'}, {'{pages}'})
+                    </label>
+                    <input
+                      id="number-format-input"
+                      type="text"
+                      class="text-input"
+                      value={numberFormat}
+                      oninput={(e) => {
+                        numberFormat = e.currentTarget.value;
+                      }}
+                      placeholder={"Page {n} of {total}"}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-pos-select">
+                      Placement
+                    </label>
+                    <select
+                      id="number-pos-select"
+                      class="text-input"
+                      value={numberPosition}
+                      onchange={(e) => {
+                        numberPosition = e.currentTarget.value as NumberPositionUi;
+                      }}
+                    >
+                      <option value="bottom-center">Bottom Center</option>
+                      <option value="bottom-right">Bottom Right</option>
+                      <option value="bottom-left">Bottom Left</option>
+                      <option value="top-center">Top Center</option>
+                      <option value="top-right">Top Right</option>
+                      <option value="top-left">Top Left</option>
+                    </select>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-start-input">
+                      Start Number ({'{n}'})
+                    </label>
+                    <input
+                      id="number-start-input"
+                      type="number"
+                      min="1"
+                      class="text-input"
+                      value={numberStart}
+                      oninput={(e) => {
+                        numberStart = Math.max(1, Number(e.currentTarget.value) || 1);
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-size-range">
+                      Font Size ({numberFontSize} pt)
+                    </label>
+                    <input
+                      id="number-size-range"
+                      type="range"
+                      min="8"
+                      max="36"
+                      step="1"
+                      value={numberFontSize}
+                      oninput={(e) => {
+                        numberFontSize = Number(e.currentTarget.value) || 11;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-opacity-range">
+                      Opacity ({Math.round(numberOpacity * 100)}%)
+                    </label>
+                    <input
+                      id="number-opacity-range"
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={numberOpacity}
+                      oninput={(e) => {
+                        numberOpacity = Number(e.currentTarget.value) || 1.0;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Color</span>
+                    <div class="segmented-control">
+                      {#each [
+                        { label: 'Black', hex: '#111827' },
+                        { label: 'Gray', hex: '#6B7280' },
+                        { label: 'Blue', hex: '#2563EB' },
+                      ] as c (c.hex)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={numberColor === c.hex}
+                          onclick={() => {
+                            numberColor = c.hex;
+                          }}
+                        >
+                          {c.label}
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-pages-input">
+                      Target Pages (e.g. 2- to skip cover)
+                    </label>
+                    <input
+                      id="number-pages-input"
+                      type="text"
+                      class="text-input"
+                      value={numberPagesSpec}
+                      oninput={(e) =>
+                        handleRangesInputEdit(e.currentTarget.value, 'number')}
+                      placeholder="All pages"
+                    />
+                  </div>
+                {/if}
+
+                <div class="option-group overlay-preview-group">
+                  <div class="label-row">
+                    <span class="field-label">Live Preview</span>
+                    <span class="preview-badge">
+                      Page {selectedPages.size > 0 ? Math.min(...selectedPages) : 1}
+                    </span>
+                  </div>
+                  <div class="overlay-preview-box">
+                    {#if overlayPreviewItem}
+                      <img
+                        src={overlayPreviewItem.data_url}
+                        alt="Overlay Live Preview"
+                        class="overlay-preview-img"
+                        class:dimmed={overlayPreviewLoading}
+                      />
+                    {:else if overlayPreviewLoading}
+                      <div class="preview-status-text">Rendering preview…</div>
+                    {:else if overlayPreviewError}
+                      <div class="preview-error-text">{overlayPreviewError}</div>
+                    {:else}
+                      <div class="preview-status-text">Preview loading…</div>
+                    {/if}
+                  </div>
                 </div>
               {:else if activeTool === 'protect' && primaryFile}
                 <div class="option-group">
@@ -1562,6 +1848,8 @@
                           : 'Render PDF from Markdown'}
                   {:else if activeTool === 'protect'}
                     {protectAction === 'protect' ? 'Encrypt PDF' : 'Unlock PDF'}
+                  {:else if activeTool === 'watermark'}
+                    {overlayMode === 'watermark' ? 'Apply Watermark' : 'Apply Page Numbers'}
                   {:else}
                     {currentToolMeta.actionLabel}
                   {/if}
@@ -2005,5 +2293,57 @@
     margin: 0;
     font-size: 12px;
     word-break: break-all;
+  }
+
+  .overlay-preview-group {
+    margin-top: var(--space-2);
+  }
+
+  .preview-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--accent);
+  }
+
+  .overlay-preview-box {
+    width: 100%;
+    min-height: 140px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2);
+    overflow: hidden;
+  }
+
+  .overlay-preview-img {
+    max-width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: opacity var(--transition-fast);
+  }
+
+  .overlay-preview-img.dimmed {
+    opacity: 0.5;
+  }
+
+  .preview-status-text {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .preview-error-text {
+    font-size: 11px;
+    color: var(--danger);
+    text-align: center;
+    padding: var(--space-2);
   }
 </style>

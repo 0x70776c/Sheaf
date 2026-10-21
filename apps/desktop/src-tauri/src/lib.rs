@@ -15,13 +15,14 @@ use serde::Serialize;
 use sheaf_core::{
     CapabilitiesReport, CompressOptions, CompressPreset, CompressReport, ConvertPageSize,
     ConvertReport, DEFAULT_THUMBNAIL_WIDTH_PX, ImageFormat, ImagesToPdfOptions, InfoReport,
-    MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, PageOpOptions, PageSelection,
-    PagesReport, PdfToImagesOptions, PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport,
-    SheafError, SplitMode, SplitOptions, SplitReport, UnlockOptions, WatermarkOptions,
-    WatermarkPosition, WatermarkReport, capabilities, compress_with_options, delete_pages,
-    extract_pages, images_to_pdf, info, markdown_to_pdf, merge_with_options, pdf_to_images,
-    pdf_to_markdown, protect, render_thumbnails, reorder_pages, rotate_pages, split, unlock,
-    watermark,
+    MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, NumberOptions, NumberPosition,
+    NumberReport, OverlayPosition, PageOpOptions, PageSelection, PagesReport, PdfToImagesOptions,
+    PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport, SheafError, SplitMode,
+    SplitOptions, SplitReport, UnlockOptions, WatermarkOptions, WatermarkPosition, WatermarkReport,
+    capabilities, compress_with_options, delete_pages, extract_pages, format_page_number,
+    images_to_pdf, info, markdown_to_pdf, merge_with_options, number, pdf_to_images,
+    pdf_to_markdown, preview_overlay_page, protect, render_thumbnails, reorder_pages, rotate_pages,
+    split, unlock, watermark,
 };
 use tauri::{AppHandle, Emitter, State};
 
@@ -417,6 +418,44 @@ pub fn execute_watermark_op(
     watermark(input, &opts, progress)
 }
 
+/// Core execution helper for `run_number` (testable without a Tauri `AppHandle`).
+#[allow(clippy::too_many_arguments)]
+pub fn execute_number_op(
+    input: &Path,
+    format: &str,
+    position: &str,
+    start: u32,
+    font_size: f32,
+    opacity: f32,
+    color: &str,
+    margin: f32,
+    pages: Option<&str>,
+    out: Option<&Path>,
+    force: bool,
+    progress: &dyn Progress,
+) -> Result<NumberReport, SheafError> {
+    let pos = NumberPosition::parse(position)?;
+    let opts = NumberOptions {
+        format: format.to_string(),
+        position: pos,
+        start,
+        font_size,
+        opacity,
+        color: color.to_string(),
+        margin,
+        pages: pages
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
+        out: out
+            .filter(|p| !p.as_os_str().is_empty())
+            .map(Path::to_path_buf),
+        force,
+        dry_run: false,
+    };
+    number(input, &opts, progress)
+}
+
 /// Core execution helper for `run_protect` (testable without a Tauri `AppHandle`).
 #[allow(clippy::too_many_arguments)]
 pub fn execute_protect_op(
@@ -793,6 +832,121 @@ async fn run_watermark(
     res.map_err(CommandError::from)
 }
 
+/// Runs PDF page numbering on a worker thread with progress reporting and cancellation support.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn run_number(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: String,
+    format: String,
+    position: String,
+    start: u32,
+    font_size: f32,
+    opacity: f32,
+    color: String,
+    margin: f32,
+    pages: Option<String>,
+    out: Option<String>,
+    force: bool,
+) -> Result<NumberReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_path = PathBuf::from(input);
+    let out_path = out.map(PathBuf::from);
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "number",
+            cancelled,
+        };
+        execute_number_op(
+            &input_path,
+            &format,
+            &position,
+            start,
+            font_size,
+            opacity,
+            &color,
+            margin,
+            pages.as_deref(),
+            out_path.as_deref(),
+            force,
+            &progress,
+        )
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
+/// Renders an in-memory live preview of a single PDF page with either a watermark or page number overlay.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn preview_overlay(
+    input: String,
+    page: u32,
+    total_pages: u32,
+    mode: String,
+    text: String,
+    position: String,
+    start: u32,
+    font_size: f32,
+    opacity: f32,
+    color: String,
+    margin: f32,
+    width_px: Option<u32>,
+) -> Result<ThumbnailItem, CommandError> {
+    let input_path = PathBuf::from(input);
+    let target_width = width_px.unwrap_or(240);
+
+    let res = tauri::async_runtime::spawn_blocking(move || -> Result<ThumbnailItem, SheafError> {
+        let pos = OverlayPosition::parse(&position)?;
+        let (resolved_text, bold, rot) = if mode == "number" {
+            let expanded =
+                format_page_number(&text, start, total_pages.max(1), page, total_pages.max(1))?;
+            (expanded, false, 0.0)
+        } else {
+            (text, true, pos.default_rotation_deg())
+        };
+        let png_bytes = preview_overlay_page(
+            &input_path,
+            page,
+            &resolved_text,
+            pos,
+            font_size,
+            opacity,
+            rot,
+            &color,
+            margin,
+            bold,
+            target_width,
+        )?;
+        let (w, h) = parse_png_dimensions(&png_bytes);
+        let b64 = BASE64_STANDARD.encode(&png_bytes);
+        Ok(ThumbnailItem {
+            page,
+            width_px: w,
+            height_px: h,
+            data_url: format!("data:image/png;base64,{b64}"),
+        })
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
 /// Runs PDF password protection (`protect`) or decryption (`unlock`) on a worker thread.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
@@ -918,6 +1072,8 @@ pub fn run() {
             run_compress,
             run_convert,
             run_watermark,
+            run_number,
+            preview_overlay,
             run_protect,
             reveal_in_finder,
             open_path,
@@ -1062,7 +1218,27 @@ mod tests {
         .unwrap_or_else(|_| std::process::abort());
         assert_eq!(ext_rep.output_pages, 2);
 
-        // 4. Cancellation works and returns SheafError::Cancelled
+        // 4. Number operation end-to-end
+        let num_out = temp.path().join("ui_numbered.pdf");
+        let num_rep = execute_number_op(
+            &f3,
+            "Page {n} of {total}",
+            "bottom-right",
+            1,
+            12.0,
+            1.0,
+            "#111827",
+            28.0,
+            Some("2-3"),
+            Some(&num_out),
+            true,
+            &NoProgress,
+        )
+        .unwrap_or_else(|_| std::process::abort());
+        assert_eq!(num_rep.pages_numbered, vec![2, 3]);
+        assert!(num_out.exists());
+
+        // 5. Cancellation works and returns SheafError::Cancelled
         let cancelled_flag = Arc::new(AtomicBool::new(true));
         let cancel_progress = CancelProgress {
             cancelled: cancelled_flag,

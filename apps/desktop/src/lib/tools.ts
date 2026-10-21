@@ -58,12 +58,12 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: 'watermark',
-    label: 'Watermark',
+    label: 'Overlay',
     group: 'secondary',
     shortcut: '⌘6',
-    actionLabel: 'Apply Watermark',
-    emptyPrompt: 'Drop a PDF file here to add a text or image watermark',
-    description: 'Place customizable text or image watermarks with opacity and rotation.',
+    actionLabel: 'Apply Overlay',
+    emptyPrompt: 'Drop a PDF file here to add a watermark or page numbers',
+    description: 'Stamp customizable text watermarks or page numbers with live preview.',
   },
   {
     id: 'protect',

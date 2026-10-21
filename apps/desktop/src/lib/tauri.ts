@@ -11,6 +11,9 @@ import type {
   ImageFormatUi,
   InfoReport,
   MergeReport,
+  NumberPositionUi,
+  NumberReport,
+  OverlayModeUi,
   PagesActionUi,
   PagesReport,
   ProgressEventPayload,
@@ -230,6 +233,72 @@ export async function runWatermarkCommand(
     pages: params.pages ?? null,
     out: params.out ?? null,
     force: params.force ?? true,
+  });
+}
+
+export interface RunNumberParams {
+  input: string;
+  format: string;
+  position: NumberPositionUi;
+  start: number;
+  fontSize: number;
+  opacity: number;
+  color: string;
+  margin: number;
+  pages?: string | null;
+  out?: string | null;
+  force?: boolean;
+}
+
+export async function runNumberCommand(
+  params: RunNumberParams,
+): Promise<NumberReport> {
+  return await invoke<NumberReport>('run_number', {
+    input: params.input,
+    format: params.format,
+    position: params.position,
+    start: params.start,
+    fontSize: params.fontSize,
+    opacity: params.opacity,
+    color: params.color,
+    margin: params.margin,
+    pages: params.pages ?? null,
+    out: params.out ?? null,
+    force: params.force ?? true,
+  });
+}
+
+export interface PreviewOverlayParams {
+  input: string;
+  page: number;
+  totalPages: number;
+  mode: OverlayModeUi;
+  text: string;
+  position: string;
+  start: number;
+  fontSize: number;
+  opacity: number;
+  color: string;
+  margin: number;
+  widthPx?: number;
+}
+
+export async function previewOverlayCommand(
+  params: PreviewOverlayParams,
+): Promise<ThumbnailItem> {
+  return await invoke<ThumbnailItem>('preview_overlay', {
+    input: params.input,
+    page: params.page,
+    totalPages: params.totalPages,
+    mode: params.mode,
+    text: params.text,
+    position: params.position,
+    start: params.start,
+    fontSize: params.fontSize,
+    opacity: params.opacity,
+    color: params.color,
+    margin: params.margin,
+    widthPx: params.widthPx ?? 240,
   });
 }
 
