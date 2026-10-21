@@ -17,5 +17,6 @@ pub use error::SheafError;
 pub use ops::capabilities::{CapabilitiesReport, capabilities};
 pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
+pub use ops::split::{PageSelection, SplitMode, SplitOptions, SplitOutput, SplitReport, split};
 pub use ops::verify::{VerifyFileResult, VerifyOptions, VerifyReport, verify};
 pub use progress::{NoProgress, Progress};
