@@ -98,6 +98,24 @@ pub enum Commands {
     )]
     Convert(ConvertArgs),
 
+    /// Add a customizable text watermark to PDF pages
+    #[command(
+        after_help = "Examples:\n  sheaf watermark report.pdf --text \"CONFIDENTIAL\" -o watermarked.pdf\n  sheaf watermark draft.pdf --text \"DRAFT\" --position bottom-right --opacity 0.35 --font-size 36 -o out.pdf --json"
+    )]
+    Watermark(WatermarkArgs),
+
+    /// Password-protect (encrypt) a PDF file
+    #[command(
+        after_help = "Examples:\n  sheaf protect report.pdf --password \"secret123\" -o protected.pdf\n  sheaf protect contract.pdf --password \"open-pw\" --owner-password \"owner-pw\" --no-copy -o locked.pdf --json"
+    )]
+    Protect(ProtectArgs),
+
+    /// Remove password protection (decrypt) from an encrypted PDF file
+    #[command(
+        after_help = "Examples:\n  sheaf unlock protected.pdf --password \"secret123\" -o unlocked.pdf\n  sheaf unlock encrypted.pdf --password \"user-secret\" -o plain.pdf --json"
+    )]
+    Unlock(UnlockArgs),
+
     /// Inspect structural properties and metadata of PDF files
     #[command(after_help = "Examples:\n  sheaf info document.pdf\n  sheaf info a.pdf b.pdf --json")]
     Info(InfoArgs),
@@ -402,6 +420,84 @@ pub struct ConvertFromMarkdownArgs {
     pub margin: f32,
 
     /// Target output PDF file (defaults to {stem}.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct WatermarkArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Text to stamp as a watermark
+    #[arg(long)]
+    pub text: String,
+
+    /// Watermark placement: diagonal, center, top-left, top-right, bottom-left, or bottom-right
+    #[arg(long, default_value = "diagonal")]
+    pub position: String,
+
+    /// Font size in PDF points (6..=300)
+    #[arg(long, default_value_t = 48.0)]
+    pub font_size: f32,
+
+    /// Opacity between 0.05 and 1.0
+    #[arg(long, default_value_t = 0.25)]
+    pub opacity: f32,
+
+    /// Optional explicit rotation angle in degrees (overrides position default)
+    #[arg(long, allow_hyphen_values = true)]
+    pub rotation: Option<f32>,
+
+    /// Color as #RRGGBB hex or preset name (gray, red, blue, black, green)
+    #[arg(long, default_value = "#6B7280")]
+    pub color: String,
+
+    /// Optional 1-based page ranges to watermark (omit to watermark all pages)
+    #[arg(long)]
+    pub pages: Option<String>,
+
+    /// Target output PDF file (defaults to {stem}_watermarked.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct ProtectArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// User password required to open the PDF
+    #[arg(long)]
+    pub password: String,
+
+    /// Optional owner password (defaults to --password)
+    #[arg(long)]
+    pub owner_password: Option<String>,
+
+    /// Disallow printing the protected PDF
+    #[arg(long)]
+    pub no_print: bool,
+
+    /// Disallow copying text and graphics from the protected PDF
+    #[arg(long)]
+    pub no_copy: bool,
+
+    /// Target output PDF file (defaults to {stem}_protected.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct UnlockArgs {
+    /// Encrypted input PDF file
+    pub input: PathBuf,
+
+    /// Password to unlock the PDF
+    #[arg(long)]
+    pub password: String,
+
+    /// Target output PDF file (defaults to {stem}_unlocked.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
 }

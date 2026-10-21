@@ -144,6 +144,39 @@ export type ConvertReport =
   | PdfToMarkdownReport
   | MarkdownToPdfReport;
 
+export type WatermarkPositionUi =
+  | 'diagonal'
+  | 'center'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
+
+export interface WatermarkReport {
+  input: string;
+  output: string;
+  text: string;
+  position: string;
+  font_size: number;
+  opacity: number;
+  rotation_deg: number;
+  color: string;
+  total_pages: number;
+  pages_watermarked: number[];
+  dry_run: boolean;
+}
+
+export type ProtectActionUi = 'protect' | 'unlock';
+
+export interface ProtectReport {
+  action: 'protect' | 'unlock';
+  input: string;
+  output: string;
+  pages: number;
+  encrypted: boolean;
+  dry_run: boolean;
+}
+
 export interface ThumbnailItem {
   page: number;
   width_px: number;

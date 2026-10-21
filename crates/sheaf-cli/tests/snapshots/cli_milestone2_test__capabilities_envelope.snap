@@ -78,6 +78,42 @@ expression: cap_val
       },
       {
         "args": [
+          "input",
+          "--text",
+          "--position",
+          "--font-size",
+          "--opacity",
+          "--rotation",
+          "--color",
+          "--pages",
+          "-o"
+        ],
+        "name": "watermark",
+        "status": "stable"
+      },
+      {
+        "args": [
+          "input",
+          "--password",
+          "--owner-password",
+          "--no-print",
+          "--no-copy",
+          "-o"
+        ],
+        "name": "protect",
+        "status": "stable"
+      },
+      {
+        "args": [
+          "input",
+          "--password",
+          "-o"
+        ],
+        "name": "unlock",
+        "status": "stable"
+      },
+      {
+        "args": [
           "file..."
         ],
         "name": "info",

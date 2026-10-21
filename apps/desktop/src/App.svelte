@@ -40,7 +40,9 @@
     runConvertCommand,
     runMergeCommand,
     runPagesCommand,
+    runProtectCommand,
     runSplitCommand,
+    runWatermarkCommand,
   } from './lib/tauri';
   import type {
     CommandErrorPayload,
@@ -51,11 +53,13 @@
     ImageFormatUi,
     PagesActionUi,
     ProgressEventPayload,
+    ProtectActionUi,
     SplitModeUi,
     ThemePreference,
     ThumbnailItem,
     ToastNotice,
     ToolId,
+    WatermarkPositionUi,
   } from './lib/types';
 
   let activeTool = $state<ToolId>('merge');
@@ -101,6 +105,23 @@
   let convertOutPath = $state<string | null>(null);
   let convertImagePaths = $state<string[]>([]);
   let convertMarkdownPath = $state<string | null>(null);
+
+  // Watermark options
+  let watermarkText = $state('CONFIDENTIAL');
+  let watermarkPosition = $state<WatermarkPositionUi>('diagonal');
+  let watermarkFontSize = $state<number>(48);
+  let watermarkOpacity = $state<number>(0.25);
+  let watermarkColor = $state('#6B7280');
+  let watermarkPagesSpec = $state('');
+  let watermarkOutPath = $state<string | null>(null);
+
+  // Protect options
+  let protectAction = $state<ProtectActionUi>('protect');
+  let protectPassword = $state('');
+  let protectOwnerPassword = $state('');
+  let protectAllowPrint = $state(true);
+  let protectAllowCopy = $state(true);
+  let protectOutPath = $state<string | null>(null);
 
   // Execution & feedback state
   let isRunning = $state(false);
@@ -210,6 +231,10 @@
           splitRangesInput = total > 1 ? `1-${Math.min(3, total)}` : '1';
           pagesSpecInput = '';
           convertPagesSpec = '';
+          watermarkPagesSpec = '';
+          if (first.encrypted) {
+            protectAction = 'unlock';
+          }
           await loadThumbnailsUpTo(first, 20);
         }
       }
@@ -263,19 +288,23 @@
       (convertAction === 'to-images' || convertAction === 'to-markdown')
     ) {
       convertPagesSpec = formatted;
+    } else if (activeTool === 'watermark') {
+      watermarkPagesSpec = formatted;
     }
   }
 
   function handleRangesInputEdit(
     value: string,
-    target: 'split' | 'pages' | 'convert',
+    target: 'split' | 'pages' | 'convert' | 'watermark',
   ) {
     if (target === 'split') {
       splitRangesInput = value;
     } else if (target === 'pages') {
       pagesSpecInput = value;
-    } else {
+    } else if (target === 'convert') {
       convertPagesSpec = value;
+    } else {
+      watermarkPagesSpec = value;
     }
     if (primaryTotalPages > 0) {
       selectedPages = parseRangesToPageSet(value, primaryTotalPages);
@@ -432,6 +461,45 @@
             targetPath: rep.output,
           };
         }
+      } else if (activeTool === 'watermark' && primaryFile) {
+        const rep = await runWatermarkCommand({
+          input: primaryFile.path,
+          text: watermarkText,
+          position: watermarkPosition,
+          fontSize: watermarkFontSize,
+          opacity: watermarkOpacity,
+          color: watermarkColor,
+          pages: watermarkPagesSpec.trim() || null,
+          out: watermarkOutPath,
+          force: true,
+        });
+        toastNotice = {
+          title: `Watermarked ${rep.pages_watermarked.length} ${rep.pages_watermarked.length === 1 ? 'page' : 'pages'}`,
+          subtitle: basename(rep.output),
+          targetPath: rep.output,
+        };
+      } else if (activeTool === 'protect' && primaryFile) {
+        const rep = await runProtectCommand({
+          action: protectAction,
+          input: primaryFile.path,
+          password: protectPassword,
+          ownerPassword:
+            protectAction === 'protect' && protectOwnerPassword.trim()
+              ? protectOwnerPassword.trim()
+              : null,
+          allowPrint: protectAllowPrint,
+          allowCopy: protectAllowCopy,
+          out: protectOutPath,
+          force: true,
+        });
+        toastNotice = {
+          title:
+            rep.action === 'protect'
+              ? `Encrypted PDF (${rep.pages} pages)`
+              : `Unlocked PDF (${rep.pages} pages)`,
+          subtitle: basename(rep.output),
+          targetPath: rep.output,
+        };
       }
     } catch (err) {
       errorBanner = extractErrorMessage(err);
@@ -1227,6 +1295,198 @@
                     </div>
                   </div>
                 {/if}
+              {:else if activeTool === 'watermark' && primaryFile}
+                <div class="option-group">
+                  <label class="field-label" for="watermark-text-input">
+                    Watermark Text
+                  </label>
+                  <input
+                    id="watermark-text-input"
+                    type="text"
+                    class="text-input"
+                    value={watermarkText}
+                    oninput={(e) => {
+                      watermarkText = e.currentTarget.value;
+                    }}
+                    placeholder="CONFIDENTIAL"
+                  />
+                </div>
+
+                <div class="option-group">
+                  <label class="field-label" for="watermark-pos-select">
+                    Placement
+                  </label>
+                  <select
+                    id="watermark-pos-select"
+                    class="text-input"
+                    value={watermarkPosition}
+                    onchange={(e) => {
+                      watermarkPosition = e.currentTarget.value as WatermarkPositionUi;
+                    }}
+                  >
+                    <option value="diagonal">Diagonal (45°)</option>
+                    <option value="center">Center (Horizontal)</option>
+                    <option value="top-left">Top Left</option>
+                    <option value="top-right">Top Right</option>
+                    <option value="bottom-left">Bottom Left</option>
+                    <option value="bottom-right">Bottom Right</option>
+                  </select>
+                </div>
+
+                <div class="option-group">
+                  <label class="field-label" for="watermark-size-range">
+                    Font Size ({watermarkFontSize} pt)
+                  </label>
+                  <input
+                    id="watermark-size-range"
+                    type="range"
+                    min="14"
+                    max="120"
+                    step="2"
+                    value={watermarkFontSize}
+                    oninput={(e) => {
+                      watermarkFontSize = Number(e.currentTarget.value) || 48;
+                    }}
+                  />
+                </div>
+
+                <div class="option-group">
+                  <label class="field-label" for="watermark-opacity-range">
+                    Opacity ({Math.round(watermarkOpacity * 100)}%)
+                  </label>
+                  <input
+                    id="watermark-opacity-range"
+                    type="range"
+                    min="0.05"
+                    max="0.9"
+                    step="0.05"
+                    value={watermarkOpacity}
+                    oninput={(e) => {
+                      watermarkOpacity = Number(e.currentTarget.value) || 0.25;
+                    }}
+                  />
+                </div>
+
+                <div class="option-group">
+                  <span class="field-label">Color</span>
+                  <div class="segmented-control">
+                    {#each [
+                      { label: 'Gray', hex: '#6B7280' },
+                      { label: 'Red', hex: '#DC2626' },
+                      { label: 'Blue', hex: '#2563EB' },
+                    ] as c (c.hex)}
+                      <button
+                        type="button"
+                        class="seg-btn"
+                        class:active={watermarkColor === c.hex}
+                        onclick={() => {
+                          watermarkColor = c.hex;
+                        }}
+                      >
+                        {c.label}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+
+                <div class="option-group">
+                  <label class="field-label" for="watermark-pages-input">
+                    Target Pages (empty = all pages)
+                  </label>
+                  <input
+                    id="watermark-pages-input"
+                    type="text"
+                    class="text-input"
+                    value={watermarkPagesSpec}
+                    oninput={(e) =>
+                      handleRangesInputEdit(e.currentTarget.value, 'watermark')}
+                    placeholder="All pages"
+                  />
+                </div>
+              {:else if activeTool === 'protect' && primaryFile}
+                <div class="option-group">
+                  <span class="field-label">Mode</span>
+                  <div class="segmented-control">
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={protectAction === 'protect'}
+                      onclick={() => {
+                        protectAction = 'protect';
+                      }}
+                    >
+                      Encrypt
+                    </button>
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={protectAction === 'unlock'}
+                      onclick={() => {
+                        protectAction = 'unlock';
+                      }}
+                    >
+                      Unlock
+                    </button>
+                  </div>
+                </div>
+
+                <div class="option-group">
+                  <label class="field-label" for="protect-pw-input">
+                    {protectAction === 'protect'
+                      ? 'Password to Open PDF'
+                      : 'Password to Unlock PDF'}
+                  </label>
+                  <input
+                    id="protect-pw-input"
+                    type="password"
+                    class="text-input"
+                    value={protectPassword}
+                    oninput={(e) => {
+                      protectPassword = e.currentTarget.value;
+                    }}
+                    placeholder="Enter password…"
+                  />
+                </div>
+
+                {#if protectAction === 'protect'}
+                  <div class="option-group">
+                    <label class="field-label" for="protect-owner-pw-input">
+                      Owner Password (optional)
+                    </label>
+                    <input
+                      id="protect-owner-pw-input"
+                      type="password"
+                      class="text-input"
+                      value={protectOwnerPassword}
+                      oninput={(e) => {
+                        protectOwnerPassword = e.currentTarget.value;
+                      }}
+                      placeholder="Defaults to open password"
+                    />
+                  </div>
+
+                  <label class="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={protectAllowPrint}
+                      onchange={(e) => {
+                        protectAllowPrint = e.currentTarget.checked;
+                      }}
+                    />
+                    <span>Allow printing</span>
+                  </label>
+
+                  <label class="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={protectAllowCopy}
+                      onchange={(e) => {
+                        protectAllowCopy = e.currentTarget.checked;
+                      }}
+                    />
+                    <span>Allow copying text & graphics</span>
+                  </label>
+                {/if}
               {:else if activeTool === 'info' && primaryFile}
                 <div class="info-list">
                   <div class="info-item">
@@ -1253,13 +1513,13 @@
                         : 'None'}
                     </span>
                   </div>
-                  {#if primaryFile.metadata.title}
+                  {#if primaryFile.metadata?.title}
                     <div class="info-item">
                       <span class="field-label">Title</span>
                       <span class="info-val">{primaryFile.metadata.title}</span>
                     </div>
                   {/if}
-                  {#if primaryFile.metadata.author}
+                  {#if primaryFile.metadata?.author}
                     <div class="info-item">
                       <span class="field-label">Author</span>
                       <span class="info-val">{primaryFile.metadata.author}</span>
@@ -1275,7 +1535,7 @@
             </div>
 
             <div class="options-footer">
-              {#if activeTool === 'merge' || activeTool === 'split' || activeTool === 'pages' || activeTool === 'compress' || activeTool === 'convert'}
+              {#if activeTool === 'merge' || activeTool === 'split' || activeTool === 'pages' || activeTool === 'compress' || activeTool === 'convert' || activeTool === 'watermark' || activeTool === 'protect'}
                 <button
                   type="button"
                   class="primary-action-btn"
@@ -1300,6 +1560,8 @@
                         : convertAction === 'to-markdown'
                           ? 'Export Markdown (.md)'
                           : 'Render PDF from Markdown'}
+                  {:else if activeTool === 'protect'}
+                    {protectAction === 'protect' ? 'Encrypt PDF' : 'Unlock PDF'}
                   {:else}
                     {currentToolMeta.actionLabel}
                   {/if}

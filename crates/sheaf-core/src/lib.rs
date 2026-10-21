@@ -30,6 +30,7 @@ pub use ops::pages::{
     PageOpOptions, PagesReport, delete_pages, extract_pages, get_effective_page_rotation,
     normalize_rotation_degrees, reorder_pages, rotate_pages,
 };
+pub use ops::protect::{ProtectOptions, ProtectReport, UnlockOptions, protect, unlock};
 pub use ops::render::{
     DEFAULT_RENDER_DPI, DEFAULT_THUMBNAIL_WIDTH_PX, RenderOptions, RenderReport, RenderScale,
     RenderedPageOutput, default_thumbnail_cache_dir, is_pdfium_available, render_page,
@@ -37,4 +38,7 @@ pub use ops::render::{
 };
 pub use ops::split::{PageSelection, SplitMode, SplitOptions, SplitOutput, SplitReport, split};
 pub use ops::verify::{VerifyFileResult, VerifyOptions, VerifyReport, verify};
+pub use ops::watermark::{
+    WatermarkOptions, WatermarkPosition, WatermarkReport, parse_watermark_color, watermark,
+};
 pub use progress::{NoProgress, Progress};

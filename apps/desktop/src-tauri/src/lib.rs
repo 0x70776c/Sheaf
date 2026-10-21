@@ -16,10 +16,12 @@ use sheaf_core::{
     CapabilitiesReport, CompressOptions, CompressPreset, CompressReport, ConvertPageSize,
     ConvertReport, DEFAULT_THUMBNAIL_WIDTH_PX, ImageFormat, ImagesToPdfOptions, InfoReport,
     MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, PageOpOptions, PageSelection,
-    PagesReport, PdfToImagesOptions, PdfToMarkdownOptions, Progress, SheafError, SplitMode,
-    SplitOptions, SplitReport, capabilities, compress_with_options, delete_pages, extract_pages,
-    images_to_pdf, info, markdown_to_pdf, merge_with_options, pdf_to_images, pdf_to_markdown,
-    render_thumbnails, reorder_pages, rotate_pages, split,
+    PagesReport, PdfToImagesOptions, PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport,
+    SheafError, SplitMode, SplitOptions, SplitReport, UnlockOptions, WatermarkOptions,
+    WatermarkPosition, WatermarkReport, capabilities, compress_with_options, delete_pages,
+    extract_pages, images_to_pdf, info, markdown_to_pdf, merge_with_options, pdf_to_images,
+    pdf_to_markdown, protect, render_thumbnails, reorder_pages, rotate_pages, split, unlock,
+    watermark,
 };
 use tauri::{AppHandle, Emitter, State};
 
@@ -379,6 +381,90 @@ pub fn execute_convert_op(
     }
 }
 
+/// Core execution helper for `run_watermark` (testable without a Tauri `AppHandle`).
+#[allow(clippy::too_many_arguments)]
+pub fn execute_watermark_op(
+    input: &Path,
+    text: &str,
+    position: &str,
+    font_size: f32,
+    opacity: f32,
+    rotation_deg: Option<f32>,
+    color: &str,
+    pages: Option<&str>,
+    out: Option<&Path>,
+    force: bool,
+    progress: &dyn Progress,
+) -> Result<WatermarkReport, SheafError> {
+    let pos = WatermarkPosition::parse(position)?;
+    let opts = WatermarkOptions {
+        text: text.to_string(),
+        position: pos,
+        font_size,
+        opacity,
+        rotation_deg,
+        color: color.to_string(),
+        pages: pages
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
+        out: out
+            .filter(|p| !p.as_os_str().is_empty())
+            .map(Path::to_path_buf),
+        force,
+        dry_run: false,
+    };
+    watermark(input, &opts, progress)
+}
+
+/// Core execution helper for `run_protect` (testable without a Tauri `AppHandle`).
+#[allow(clippy::too_many_arguments)]
+pub fn execute_protect_op(
+    action: &str,
+    input: &Path,
+    password: &str,
+    owner_password: Option<&str>,
+    allow_print: bool,
+    allow_copy: bool,
+    out: Option<&Path>,
+    force: bool,
+    progress: &dyn Progress,
+) -> Result<ProtectReport, SheafError> {
+    let clean_out = out
+        .filter(|p| !p.as_os_str().is_empty())
+        .map(Path::to_path_buf);
+
+    match action {
+        "protect" => {
+            let opts = ProtectOptions {
+                user_password: password.to_string(),
+                owner_password: owner_password
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string),
+                allow_print,
+                allow_copy,
+                out: clean_out,
+                force,
+                dry_run: false,
+            };
+            protect(input, &opts, progress)
+        }
+        "unlock" => {
+            let opts = UnlockOptions {
+                password: password.to_string(),
+                out: clean_out,
+                force,
+                dry_run: false,
+            };
+            unlock(input, &opts, progress)
+        }
+        other => Err(SheafError::InvalidSelection(format!(
+            "Unsupported protect action '{other}'"
+        ))),
+    }
+}
+
 /// Inspects one or more local PDF files and returns their [`InfoReport`].
 #[tauri::command]
 async fn open_pdf(paths: Vec<String>) -> Result<InfoReport, CommandError> {
@@ -655,6 +741,106 @@ async fn run_convert(
     res.map_err(CommandError::from)
 }
 
+/// Runs PDF watermarking on a worker thread with progress reporting and cancellation support.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn run_watermark(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: String,
+    text: String,
+    position: String,
+    font_size: f32,
+    opacity: f32,
+    rotation_deg: Option<f32>,
+    color: String,
+    pages: Option<String>,
+    out: Option<String>,
+    force: bool,
+) -> Result<WatermarkReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_path = PathBuf::from(input);
+    let out_path = out.map(PathBuf::from);
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "watermark",
+            cancelled,
+        };
+        execute_watermark_op(
+            &input_path,
+            &text,
+            &position,
+            font_size,
+            opacity,
+            rotation_deg,
+            &color,
+            pages.as_deref(),
+            out_path.as_deref(),
+            force,
+            &progress,
+        )
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
+/// Runs PDF password protection (`protect`) or decryption (`unlock`) on a worker thread.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn run_protect(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    action: String,
+    input: String,
+    password: String,
+    owner_password: Option<String>,
+    allow_print: bool,
+    allow_copy: bool,
+    out: Option<String>,
+    force: bool,
+) -> Result<ProtectReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_path = PathBuf::from(input);
+    let out_path = out.map(PathBuf::from);
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "protect",
+            cancelled,
+        };
+        execute_protect_op(
+            &action,
+            &input_path,
+            &password,
+            owner_password.as_deref(),
+            allow_print,
+            allow_copy,
+            out_path.as_deref(),
+            force,
+            &progress,
+        )
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
 /// Reveals a generated file or directory in macOS Finder (`open -R`).
 #[tauri::command]
 fn reveal_in_finder(path: String) -> Result<(), CommandError> {
@@ -731,6 +917,8 @@ pub fn run() {
             run_pages,
             run_compress,
             run_convert,
+            run_watermark,
+            run_protect,
             reveal_in_finder,
             open_path,
             cancel_op,

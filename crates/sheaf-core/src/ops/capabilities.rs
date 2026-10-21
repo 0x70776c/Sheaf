@@ -116,6 +116,38 @@ pub fn capabilities() -> CapabilitiesReport {
             status: "stable",
         },
         CommandCapability {
+            name: "watermark",
+            args: vec![
+                "input",
+                "--text",
+                "--position",
+                "--font-size",
+                "--opacity",
+                "--rotation",
+                "--color",
+                "--pages",
+                "-o",
+            ],
+            status: "stable",
+        },
+        CommandCapability {
+            name: "protect",
+            args: vec![
+                "input",
+                "--password",
+                "--owner-password",
+                "--no-print",
+                "--no-copy",
+                "-o",
+            ],
+            status: "stable",
+        },
+        CommandCapability {
+            name: "unlock",
+            args: vec!["input", "--password", "-o"],
+            status: "stable",
+        },
+        CommandCapability {
             name: "info",
             args: vec!["file..."],
             status: "stable",

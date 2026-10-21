@@ -9,9 +9,11 @@ pub mod convert;
 pub mod info;
 pub mod merge;
 pub mod pages;
+pub mod protect;
 pub mod render;
 pub mod split;
 pub mod verify;
+pub mod watermark;
 
 /// Execution context passed to every CLI command.
 pub struct Ctx {

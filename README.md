@@ -64,7 +64,7 @@ npm run build
 - **Interactive Thumbnail Grid & Progressive Disclosure:**
   - Lazy-loaded PDFium page thumbnails with skeleton placeholders and bi-directional page range synchronization.
   - Multi-page selection via single click, `⇧+Click` (range), `⌘+Click` (toggle), and `⌘A` (select/deselect all).
-  - Dedicated right-hand options panels for **Merge** (queue reordering, add/remove files), **Split** (*Ranges* with *Combine* toggle, *Every N*, *Bookmarks*), **Pages** (*Rotate* 90°/180°/270°, *Delete*, *Reorder*, *Extract*), **Compress** (*Low* / *Medium* / *High* presets + *Grayscale* toggle with before/after size comparison), **Convert** (*PDF → Images*, *Images → PDF*, *PDF → Markdown*, and *Markdown → PDF*), and **Info**.
+  - Dedicated right-hand options panels for **Merge** (queue reordering, add/remove files), **Split** (*Ranges* with *Combine* toggle, *Every N*, *Bookmarks*), **Pages** (*Rotate* 90°/180°/270°, *Delete*, *Reorder*, *Extract*), **Compress** (*Low* / *Medium* / *High* presets + *Grayscale* toggle with before/after size comparison), **Convert** (*PDF → Images*, *Images → PDF*, *PDF → Markdown*, and *Markdown → PDF*), **Watermark** (text, placement, font size, opacity, color, page selection), **Protect** (encrypt with user/owner passwords & permissions or unlock password-protected PDFs), and **Info**.
   - Real-time progress bar with cancellation (`Cancel`) and completion toast with **Show in Finder** (`open -R`) and **Open** actions.
 - **Keyboard-First Workflow:**
   - `⌘K`: Open Command Palette to switch tools, open files, or toggle theme (`System` / `Light` / `Dark`)
@@ -199,7 +199,33 @@ sheaf convert from-markdown README.md --page-size a4 --margin 54 -o README.pdf -
 
 ---
 
-### 7. `sheaf info`
+### 7. `sheaf watermark`
+Stamp a customizable vector text watermark onto all or selected PDF pages with configurable placement (`diagonal`, `center`, `top-left`, `top-right`, `bottom-left`, `bottom-right`), `--font-size`, `--opacity` (`0.05..=1.0`), `--rotation`, and `--color` (`#RRGGBB` hex or `gray`/`red`/`blue`/`black`/`green`).
+
+```bash
+# Diagonal watermark across all pages
+sheaf watermark report.pdf --text "CONFIDENTIAL" -o report_watermarked.pdf
+
+# Bottom-right red watermark on selected pages
+sheaf watermark draft.pdf --text "DRAFT" --position bottom-right --color red --opacity 0.35 --pages "1-3" -o out.pdf --json
+```
+
+---
+
+### 8. `sheaf protect` & `sheaf unlock`
+Encrypt (`protect`) a PDF with user/owner passwords and print/copy permissions, or decrypt (`unlock`) an encrypted PDF (returns exit code `4` with `"code": "wrong_password"` if the password is incorrect).
+
+```bash
+# Encrypt a PDF with user and owner passwords
+sheaf protect contract.pdf --password "open-secret" --owner-password "admin-secret" --no-copy -o locked.pdf
+
+# Unlock an encrypted PDF
+sheaf unlock locked.pdf --password "open-secret" -o unlocked.pdf --json
+```
+
+---
+
+### 9. `sheaf info`
 Inspect structural properties and metadata (`size_bytes`, `pdf_version`, `pages`, `encrypted`, `metadata`, `has_outlines`, `outline_count`, `first_page_size_pt`). Encrypted PDFs return exit code `0` with `"encrypted": true` and `"pages": null`.
 
 ```bash
@@ -209,7 +235,7 @@ sheaf info a.pdf b.pdf --json
 
 ---
 
-### 8. `sheaf verify`
+### 10. `sheaf verify`
 Verify PDF files for structural integrity (loads cleanly, valid catalog & page tree, resolvable page content streams and resources). With `--deep`, also runs `qpdf --check` when available.
 
 ```bash
@@ -219,7 +245,7 @@ sheaf verify out/*.pdf --deep --json
 
 ---
 
-### 9. `sheaf capabilities`
+### 11. `sheaf capabilities`
 Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`).
 
 ```bash

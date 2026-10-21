@@ -14,9 +14,13 @@ import type {
   PagesActionUi,
   PagesReport,
   ProgressEventPayload,
+  ProtectActionUi,
+  ProtectReport,
   SplitModeUi,
   SplitReport,
   ThumbnailItem,
+  WatermarkPositionUi,
+  WatermarkReport,
 } from './types';
 
 export function isTauriRuntime(): boolean {
@@ -194,6 +198,60 @@ export async function runConvertCommand(params: RunConvertParams): Promise<Conve
     pages: params.pages ?? null,
     pageSize: params.pageSize ?? null,
     marginPt: params.marginPt ?? null,
+    out: params.out ?? null,
+    force: params.force ?? true,
+  });
+}
+
+export interface RunWatermarkParams {
+  input: string;
+  text: string;
+  position: WatermarkPositionUi;
+  fontSize: number;
+  opacity: number;
+  rotationDeg?: number | null;
+  color: string;
+  pages?: string | null;
+  out?: string | null;
+  force?: boolean;
+}
+
+export async function runWatermarkCommand(
+  params: RunWatermarkParams,
+): Promise<WatermarkReport> {
+  return await invoke<WatermarkReport>('run_watermark', {
+    input: params.input,
+    text: params.text,
+    position: params.position,
+    fontSize: params.fontSize,
+    opacity: params.opacity,
+    rotationDeg: params.rotationDeg ?? null,
+    color: params.color,
+    pages: params.pages ?? null,
+    out: params.out ?? null,
+    force: params.force ?? true,
+  });
+}
+
+export interface RunProtectParams {
+  action: ProtectActionUi;
+  input: string;
+  password: string;
+  ownerPassword?: string | null;
+  allowPrint?: boolean;
+  allowCopy?: boolean;
+  out?: string | null;
+  force?: boolean;
+}
+
+export async function runProtectCommand(params: RunProtectParams): Promise<ProtectReport> {
+  return await invoke<ProtectReport>('run_protect', {
+    action: params.action,
+    input: params.input,
+    password: params.password,
+    ownerPassword: params.ownerPassword ?? null,
+    allowPrint: params.allowPrint ?? true,
+    allowCopy: params.allowCopy ?? true,
     out: params.out ?? null,
     force: params.force ?? true,
   });
