@@ -1,0 +1,16 @@
+[package]
+name = "sheaf-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Core PDF manipulation engine for Sheaf"
+
+[dependencies]
+lopdf = "0.46.0"
+thiserror = "2.0.21"
+
+[dev-dependencies]
+insta = "1.49.0"
+proptest = "1.12.0"
+tempfile = "3.27.0"
