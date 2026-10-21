@@ -86,6 +86,12 @@ pub enum Commands {
     )]
     Render(RenderArgs),
 
+    /// Compress a PDF file by optimizing streams, deduplicating objects, and resampling images
+    #[command(
+        after_help = "Examples:\n  sheaf compress report.pdf --preset medium -o report_compressed.pdf\n  sheaf compress scan.pdf --preset high --grayscale -o scan_small.pdf --json"
+    )]
+    Compress(CompressArgs),
+
     /// Inspect structural properties and metadata of PDF files
     #[command(after_help = "Examples:\n  sheaf info document.pdf\n  sheaf info a.pdf b.pdf --json")]
     Info(InfoArgs),
@@ -262,6 +268,24 @@ pub struct RenderArgs {
     pub no_cache: bool,
 
     /// Output PNG file (when rendering a single page) or output directory
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CompressArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Compression preset: low (220 DPI, JPEG 85), medium (150 DPI, JPEG 70), or high (100 DPI, JPEG 55)
+    #[arg(long, default_value = "medium")]
+    pub preset: String,
+
+    /// Convert embedded images to grayscale
+    #[arg(long)]
+    pub grayscale: bool,
+
+    /// Target output PDF file (defaults to {stem}_compressed.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
 }

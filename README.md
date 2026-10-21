@@ -64,7 +64,7 @@ npm run build
 - **Interactive Thumbnail Grid & Progressive Disclosure:**
   - Lazy-loaded PDFium page thumbnails with skeleton placeholders and bi-directional page range synchronization.
   - Multi-page selection via single click, `⇧+Click` (range), `⌘+Click` (toggle), and `⌘A` (select/deselect all).
-  - Dedicated right-hand options panels for **Merge** (queue reordering, add/remove files), **Split** (*Ranges* with *Combine* toggle, *Every N*, *Bookmarks*), **Pages** (*Rotate* 90°/180°/270°, *Delete*, *Reorder*, *Extract*), and **Info**.
+  - Dedicated right-hand options panels for **Merge** (queue reordering, add/remove files), **Split** (*Ranges* with *Combine* toggle, *Every N*, *Bookmarks*), **Pages** (*Rotate* 90°/180°/270°, *Delete*, *Reorder*, *Extract*), **Compress** (*Low* / *Medium* / *High* presets + *Grayscale* toggle with before/after size comparison), and **Info**.
   - Real-time progress bar with cancellation (`Cancel`) and completion toast with **Show in Finder** (`open -R`) and **Open** actions.
 - **Keyboard-First Workflow:**
   - `⌘K`: Open Command Palette to switch tools, open files, or toggle theme (`System` / `Light` / `Dark`)
@@ -157,7 +157,26 @@ sheaf render report.pdf --pages "1-20" --width 160 -o thumbs/ --json
 
 ---
 
-### 5. `sheaf info`
+### 5. `sheaf compress`
+Compress a PDF file by resampling embedded Image XObjects, deduplicating identical streams, and compacting PDF structure—while keeping all vector text 100% selectable.
+If a document cannot be reduced further, original bytes are preserved and `"already_optimal": true` is reported.
+
+**Presets:**
+- `low`: 220 DPI target, JPEG quality 85, structural cleanup
+- `medium` *(default)*: 150 DPI target, JPEG quality 70, stream deduplication + resampling
+- `high`: 100 DPI target, JPEG quality 55, stream deduplication + aggressive resampling
+
+```bash
+# Compress with the default medium preset (150 DPI, JPEG 70)
+sheaf compress scan.pdf -o scan_compressed.pdf
+
+# High compression with grayscale conversion and JSON output
+sheaf compress photo_report.pdf --preset high --grayscale -o compact.pdf --json
+```
+
+---
+
+### 6. `sheaf info`
 Inspect structural properties and metadata (`size_bytes`, `pdf_version`, `pages`, `encrypted`, `metadata`, `has_outlines`, `outline_count`, `first_page_size_pt`). Encrypted PDFs return exit code `0` with `"encrypted": true` and `"pages": null`.
 
 ```bash
@@ -167,7 +186,7 @@ sheaf info a.pdf b.pdf --json
 
 ---
 
-### 6. `sheaf verify`
+### 7. `sheaf verify`
 Verify PDF files for structural integrity (loads cleanly, valid catalog & page tree, resolvable page content streams and resources). With `--deep`, also runs `qpdf --check` when available.
 
 ```bash
@@ -177,7 +196,7 @@ sheaf verify out/*.pdf --deep --json
 
 ---
 
-### 7. `sheaf capabilities`
+### 8. `sheaf capabilities`
 Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`).
 
 ```bash

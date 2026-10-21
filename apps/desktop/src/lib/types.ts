@@ -12,6 +12,7 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export type SplitModeUi = 'ranges' | 'every' | 'bookmarks';
 export type PagesActionUi = 'rotate' | 'delete' | 'reorder' | 'extract';
+export type CompressPresetUi = 'low' | 'medium' | 'high';
 
 export interface PdfMetadataInfo {
   title: string | null;
@@ -64,6 +65,21 @@ export interface PagesReport {
   output_pages: number;
   pages_affected: number[];
   degrees?: number | null;
+}
+
+export interface CompressReport {
+  input: string;
+  output: string;
+  preset: string;
+  grayscale: boolean;
+  size_before_bytes: number;
+  size_after_bytes: number;
+  saved_bytes: number;
+  saved_percent: number;
+  images_resampled: number;
+  objects_deduped: number;
+  already_optimal: boolean;
+  dry_run: boolean;
 }
 
 export interface ThumbnailItem {

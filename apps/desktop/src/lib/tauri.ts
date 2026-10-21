@@ -3,6 +3,8 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type {
   CommandErrorPayload,
+  CompressPresetUi,
+  CompressReport,
   InfoReport,
   MergeReport,
   PagesActionUi,
@@ -114,6 +116,24 @@ export async function runPagesCommand(params: RunPagesParams): Promise<PagesRepo
     action: params.action,
     pages: params.pages ?? null,
     degrees: params.degrees ?? null,
+    out: params.out ?? null,
+    force: params.force ?? true,
+  });
+}
+
+export interface RunCompressParams {
+  input: string;
+  preset: CompressPresetUi;
+  grayscale?: boolean;
+  out?: string | null;
+  force?: boolean;
+}
+
+export async function runCompressCommand(params: RunCompressParams): Promise<CompressReport> {
+  return await invoke<CompressReport>('run_compress', {
+    input: params.input,
+    preset: params.preset,
+    grayscale: params.grayscale ?? false,
     out: params.out ?? null,
     force: params.force ?? true,
   });

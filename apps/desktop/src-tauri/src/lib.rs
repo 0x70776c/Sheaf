@@ -13,9 +13,10 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::Serialize;
 use sheaf_core::{
-    CapabilitiesReport, DEFAULT_THUMBNAIL_WIDTH_PX, InfoReport, MergeOptions, MergeReport,
-    NoProgress, PageOpOptions, PageSelection, PagesReport, Progress, SheafError, SplitMode,
-    SplitOptions, SplitReport, capabilities, delete_pages, extract_pages, info, merge_with_options,
+    CapabilitiesReport, CompressOptions, CompressPreset, CompressReport,
+    DEFAULT_THUMBNAIL_WIDTH_PX, InfoReport, MergeOptions, MergeReport, NoProgress, PageOpOptions,
+    PageSelection, PagesReport, Progress, SheafError, SplitMode, SplitOptions, SplitReport,
+    capabilities, compress_with_options, delete_pages, extract_pages, info, merge_with_options,
     render_thumbnails, reorder_pages, rotate_pages, split,
 };
 use tauri::{AppHandle, Emitter, State};
@@ -258,6 +259,28 @@ pub fn execute_pages_op(
     }
 }
 
+/// Core execution helper for `run_compress` (testable without a Tauri `AppHandle`).
+pub fn execute_compress_op(
+    input: &Path,
+    preset: &str,
+    grayscale: bool,
+    out: Option<&Path>,
+    force: bool,
+    progress: &dyn Progress,
+) -> Result<CompressReport, SheafError> {
+    let parsed_preset = CompressPreset::parse(preset)?;
+    let opts = CompressOptions {
+        preset: parsed_preset,
+        grayscale,
+        out: out
+            .filter(|p| !p.as_os_str().is_empty())
+            .map(Path::to_path_buf),
+        force,
+        dry_run: false,
+    };
+    compress_with_options(input, &opts, progress)
+}
+
 /// Inspects one or more local PDF files and returns their [`InfoReport`].
 #[tauri::command]
 async fn open_pdf(paths: Vec<String>) -> Result<InfoReport, CommandError> {
@@ -441,6 +464,47 @@ async fn run_pages(
     res.map_err(CommandError::from)
 }
 
+/// Runs PDF compression on a worker thread with progress reporting and cancellation support.
+#[tauri::command]
+async fn run_compress(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: String,
+    preset: String,
+    grayscale: bool,
+    out: Option<String>,
+    force: bool,
+) -> Result<CompressReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_path = PathBuf::from(input);
+    let out_path = out.map(PathBuf::from);
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "compress",
+            cancelled,
+        };
+        execute_compress_op(
+            &input_path,
+            &preset,
+            grayscale,
+            out_path.as_deref(),
+            force,
+            &progress,
+        )
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
 /// Reveals a generated file or directory in macOS Finder (`open -R`).
 #[tauri::command]
 fn reveal_in_finder(path: String) -> Result<(), CommandError> {
@@ -515,6 +579,7 @@ pub fn run() {
             run_merge,
             run_split,
             run_pages,
+            run_compress,
             reveal_in_finder,
             open_path,
             cancel_op,

@@ -33,12 +33,14 @@
     pickPdfFiles,
     pickSavePdfPath,
     revealInFinder,
+    runCompressCommand,
     runMergeCommand,
     runPagesCommand,
     runSplitCommand,
   } from './lib/tauri';
   import type {
     CommandErrorPayload,
+    CompressPresetUi,
     FileInfo,
     PagesActionUi,
     ProgressEventPayload,
@@ -75,6 +77,11 @@
   let pagesSpecInput = $state('');
   let rotateDegrees = $state<number>(90);
   let pagesOutPath = $state<string | null>(null);
+
+  // Compress options
+  let compressPreset = $state<CompressPresetUi>('medium');
+  let compressGrayscale = $state(false);
+  let compressOutPath = $state<string | null>(null);
 
   // Execution & feedback state
   let isRunning = $state(false);
@@ -265,6 +272,25 @@
         // Reload thumbnails if operating on a document
         const updatedInfo = await openPdf([primaryFile.path]);
         loadedFiles = updatedInfo.files;
+      } else if (activeTool === 'compress' && primaryFile) {
+        const rep = await runCompressCommand({
+          input: primaryFile.path,
+          preset: compressPreset,
+          grayscale: compressGrayscale,
+          out: compressOutPath,
+          force: true,
+        });
+        toastNotice = rep.already_optimal
+          ? {
+              title: 'Document is already optimal',
+              subtitle: `${formatBytes(rep.size_before_bytes)} · ${basename(rep.output)}`,
+              targetPath: rep.output,
+            }
+          : {
+              title: `Saved ${rep.saved_percent.toFixed(1)}% (${formatBytes(rep.size_before_bytes)} → ${formatBytes(rep.size_after_bytes)})`,
+              subtitle: basename(rep.output),
+              targetPath: rep.output,
+            };
       }
     } catch (err) {
       errorBanner = extractErrorMessage(err);
@@ -751,6 +777,68 @@
                         : '1-3, 5'}
                   />
                 </div>
+              {:else if activeTool === 'compress' && primaryFile}
+                <div class="option-group">
+                  <span class="field-label">Compression Preset</span>
+                  <div class="segmented-control" role="radiogroup" aria-label="Compression Preset">
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={compressPreset === 'low'}
+                      onclick={() => {
+                        compressPreset = 'low';
+                      }}
+                    >
+                      Low
+                    </button>
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={compressPreset === 'medium'}
+                      onclick={() => {
+                        compressPreset = 'medium';
+                      }}
+                    >
+                      Medium
+                    </button>
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={compressPreset === 'high'}
+                      onclick={() => {
+                        compressPreset = 'high';
+                      }}
+                    >
+                      High
+                    </button>
+                  </div>
+                </div>
+
+                <div class="summary-pill">
+                  {#if compressPreset === 'low'}
+                    220 DPI · JPEG 85 · Structure optimization
+                  {:else if compressPreset === 'medium'}
+                    150 DPI · JPEG 70 · Deduplicate & resample
+                  {:else}
+                    100 DPI · JPEG 55 · Maximum size reduction
+                  {/if}
+                </div>
+
+                <label class="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={compressGrayscale}
+                    onchange={(e) => {
+                      compressGrayscale = e.currentTarget.checked;
+                    }}
+                  />
+                  <span>Convert images to grayscale</span>
+                </label>
+
+                <div class="option-group">
+                  <span class="field-label">Original Size</span>
+                  <div class="summary-pill">{formatBytes(primaryFile.size_bytes)}</div>
+                </div>
               {:else if activeTool === 'info' && primaryFile}
                 <div class="info-list">
                   <div class="info-item">
@@ -799,7 +887,7 @@
             </div>
 
             <div class="options-footer">
-              {#if activeTool === 'merge' || activeTool === 'split' || activeTool === 'pages'}
+              {#if activeTool === 'merge' || activeTool === 'split' || activeTool === 'pages' || activeTool === 'compress'}
                 <button
                   type="button"
                   class="primary-action-btn"

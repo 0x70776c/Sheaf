@@ -96,6 +96,11 @@ pub fn capabilities() -> CapabilitiesReport {
             status: "stable",
         },
         CommandCapability {
+            name: "compress",
+            args: vec!["input", "--preset", "--grayscale", "-o"],
+            status: "stable",
+        },
+        CommandCapability {
             name: "info",
             args: vec!["file..."],
             status: "stable",

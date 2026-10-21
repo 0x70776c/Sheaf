@@ -15,6 +15,9 @@ pub const SCHEMA_VERSION: u32 = 1;
 
 pub use error::SheafError;
 pub use ops::capabilities::{CapabilitiesReport, capabilities};
+pub use ops::compress::{
+    CompressOptions, CompressPreset, CompressReport, compress, compress_with_options,
+};
 pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
 pub use ops::pages::{

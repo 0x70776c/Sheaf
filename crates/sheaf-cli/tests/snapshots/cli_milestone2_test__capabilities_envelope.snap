@@ -53,6 +53,16 @@ expression: cap_val
       },
       {
         "args": [
+          "input",
+          "--preset",
+          "--grayscale",
+          "-o"
+        ],
+        "name": "compress",
+        "status": "stable"
+      },
+      {
+        "args": [
           "file..."
         ],
         "name": "info",

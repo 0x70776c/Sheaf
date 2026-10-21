@@ -490,6 +490,7 @@ fn cli_subcommands_help_contain_examples() {
         "split",
         "pages",
         "render",
+        "compress",
         "info",
         "verify",
         "capabilities",
