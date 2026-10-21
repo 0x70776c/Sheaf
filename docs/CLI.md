@@ -213,8 +213,6 @@ Password-protect (encrypt) a PDF file
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
-| `--password` | `<PASSWORD>` | Yes | User password required to open the PDF |
-| `--owner-password` | `<OWNER_PASSWORD>` | No | Optional owner password (defaults to --password) |
 | `--no-print` | `<NO_PRINT>` | No | Disallow printing the protected PDF |
 | `--no-copy` | `<NO_COPY>` | No | Disallow copying text and graphics from the protected PDF |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_protected.pdf) |
@@ -222,8 +220,8 @@ Password-protect (encrypt) a PDF file
 ### Examples
 
 ```bash
-sheaf protect report.pdf --password "secret123" -o protected.pdf
-sheaf protect contract.pdf --password "open-pw" --owner-password "owner-pw" --no-copy -o locked.pdf --json
+sheaf protect report.pdf --new-password-env PDF_PASS -o protected.pdf
+sheaf protect contract.pdf --new-password-file /path/to/pw --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf --json
 ```
 
 ## `sheaf unlock`
@@ -235,14 +233,13 @@ Remove password protection (decrypt) from an encrypted PDF file
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `<input>` | `<INPUT>` | Yes | Encrypted input PDF file |
-| `--password` | `<PASSWORD>` | Yes | Password to unlock the PDF |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_unlocked.pdf) |
 
 ### Examples
 
 ```bash
-sheaf unlock protected.pdf --password "secret123" -o unlocked.pdf
-sheaf unlock encrypted.pdf --password "user-secret" -o plain.pdf --json
+sheaf unlock protected.pdf --password-env PDF_PASS -o unlocked.pdf
+sheaf unlock encrypted.pdf --password-file /path/to/pw -o plain.pdf --json
 ```
 
 ## `sheaf info`

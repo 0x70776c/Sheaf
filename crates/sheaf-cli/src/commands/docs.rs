@@ -81,7 +81,7 @@ pub fn generate_cli_markdown() -> String {
         let _ = writeln!(out, "| :--- | :--- | :--- | :--- |");
 
         for arg in sub.get_arguments() {
-            if arg.get_id() == "help" || arg.get_id() == "version" {
+            if arg.get_id() == "help" || arg.get_id() == "version" || arg.is_hide_set() {
                 continue;
             }
             let name_str = if let Some(long) = arg.get_long() {

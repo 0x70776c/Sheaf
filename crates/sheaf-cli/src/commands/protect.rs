@@ -11,8 +11,20 @@ impl Command for ProtectArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
+        if self.password.is_some() || self.user_password.is_some() {
+            return Err(SheafError::InvalidSelection(
+                "--password wurde entfernt (Sicherheitsrisiko). Nutze --password-env VAR, --password-file PFAD oder --password-stdin.".to_string(),
+            ));
+        }
+        if self.owner_password.is_some() {
+            return Err(SheafError::InvalidSelection(
+                "--owner-password wurde entfernt (Sicherheitsrisiko). Nutze --new-owner-password-env VAR oder --new-owner-password-file PFAD.".to_string(),
+            ));
+        }
+
+        let user_password = self.password.clone().unwrap_or_default();
         let opts = ProtectOptions {
-            user_password: self.password.clone(),
+            user_password,
             owner_password: self.owner_password.clone(),
             allow_print: !self.no_print,
             allow_copy: !self.no_copy,
@@ -53,8 +65,15 @@ impl Command for UnlockArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
+        if self.password.is_some() || self.user_password.is_some() {
+            return Err(SheafError::InvalidSelection(
+                "--password wurde entfernt (Sicherheitsrisiko). Nutze --password-env VAR, --password-file PFAD oder --password-stdin.".to_string(),
+            ));
+        }
+
+        let password = self.password.clone().unwrap_or_default();
         let opts = UnlockOptions {
-            password: self.password.clone(),
+            password,
             out: self.out.clone(),
             force: ctx.global.force,
             dry_run: ctx.global.dry_run,

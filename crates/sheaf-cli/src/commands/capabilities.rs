@@ -24,7 +24,7 @@ pub fn generate_capabilities_report() -> CapabilitiesReport {
         let mut args = Vec::new();
 
         for arg in sub.get_arguments() {
-            if arg.get_id() == "help" || arg.get_id() == "version" {
+            if arg.get_id() == "help" || arg.get_id() == "version" || arg.is_hide_set() {
                 continue;
             }
             let long = arg.get_long().map(str::to_string);

@@ -281,18 +281,6 @@ expression: cap_val
             "value_name": "INPUT"
           },
           {
-            "long": "password",
-            "required": true,
-            "secret": true,
-            "value_name": "PASSWORD"
-          },
-          {
-            "long": "owner-password",
-            "required": false,
-            "secret": true,
-            "value_name": "OWNER_PASSWORD"
-          },
-          {
             "long": "no-print",
             "required": false,
             "secret": false,
@@ -320,12 +308,6 @@ expression: cap_val
             "required": true,
             "secret": false,
             "value_name": "INPUT"
-          },
-          {
-            "long": "password",
-            "required": true,
-            "secret": true,
-            "value_name": "PASSWORD"
           },
           {
             "long": "out",

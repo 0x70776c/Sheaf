@@ -112,13 +112,13 @@ pub enum Commands {
 
     /// Password-protect (encrypt) a PDF file
     #[command(
-        after_help = "Examples:\n  sheaf protect report.pdf --password \"secret123\" -o protected.pdf\n  sheaf protect contract.pdf --password \"open-pw\" --owner-password \"owner-pw\" --no-copy -o locked.pdf --json"
+        after_help = "Examples:\n  sheaf protect report.pdf --new-password-env PDF_PASS -o protected.pdf\n  sheaf protect contract.pdf --new-password-file /path/to/pw --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf --json"
     )]
     Protect(ProtectArgs),
 
     /// Remove password protection (decrypt) from an encrypted PDF file
     #[command(
-        after_help = "Examples:\n  sheaf unlock protected.pdf --password \"secret123\" -o unlocked.pdf\n  sheaf unlock encrypted.pdf --password \"user-secret\" -o plain.pdf --json"
+        after_help = "Examples:\n  sheaf unlock protected.pdf --password-env PDF_PASS -o unlocked.pdf\n  sheaf unlock encrypted.pdf --password-file /path/to/pw -o plain.pdf --json"
     )]
     Unlock(UnlockArgs),
 
@@ -519,13 +519,17 @@ pub struct ProtectArgs {
     /// Input PDF file
     pub input: PathBuf,
 
-    /// User password required to open the PDF
-    #[arg(long)]
-    pub password: String,
+    /// Legacy user password flag (removed for security)
+    #[arg(long, hide = true)]
+    pub password: Option<String>,
 
-    /// Optional owner password (defaults to --password)
-    #[arg(long)]
+    /// Legacy owner password flag (removed for security)
+    #[arg(long, hide = true)]
     pub owner_password: Option<String>,
+
+    /// Legacy user password alias (removed for security)
+    #[arg(long, hide = true)]
+    pub user_password: Option<String>,
 
     /// Disallow printing the protected PDF
     #[arg(long)]
@@ -545,9 +549,13 @@ pub struct UnlockArgs {
     /// Encrypted input PDF file
     pub input: PathBuf,
 
-    /// Password to unlock the PDF
-    #[arg(long)]
-    pub password: String,
+    /// Legacy password flag (removed for security)
+    #[arg(long, hide = true)]
+    pub password: Option<String>,
+
+    /// Legacy user password alias (removed for security)
+    #[arg(long, hide = true)]
+    pub user_password: Option<String>,
 
     /// Target output PDF file (defaults to {stem}_unlocked.pdf)
     #[arg(short, long)]

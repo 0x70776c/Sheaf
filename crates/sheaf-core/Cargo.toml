@@ -12,6 +12,7 @@ lopdf = "0.46.0"
 pdfium-render = "0.9.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+secrecy = { version = "0.10.3", features = ["serde"] }
 sha2 = "0.11.1"
 thiserror = "2.0.21"
 

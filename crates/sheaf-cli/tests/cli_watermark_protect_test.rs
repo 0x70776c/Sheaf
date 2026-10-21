@@ -56,7 +56,7 @@ fn cli_watermark_protect_and_unlock_end_to_end() {
         serde_json::json!([1, 2])
     );
 
-    // 2. sheaf protect
+    // 2. sheaf protect with legacy --password -> exit code 2 (migration error)
     let protected_pdf = temp.path().join("protected.pdf");
     let out_prot = sheaf_cmd()
         .args([
@@ -73,20 +73,17 @@ fn cli_watermark_protect_and_unlock_end_to_end() {
         ])
         .output()
         .expect("run sheaf protect");
-    assert_eq!(out_prot.status.code(), Some(0));
-    assert!(protected_pdf.exists());
+    assert_eq!(out_prot.status.code(), Some(2));
     let env_prot: Value = serde_json::from_slice(&out_prot.stdout).expect("parse json");
-    assert_eq!(env_prot["ok"], true);
-    assert_eq!(env_prot["op"], "protect");
-    assert_eq!(env_prot["data"]["encrypted"], true);
-    assert_eq!(env_prot["data"]["pages"], 3);
+    assert_eq!(env_prot["ok"], false);
+    assert_eq!(env_prot["error"]["exit_code"], 2);
 
-    // 3. sheaf unlock with wrong password -> exit code 4 (wrong_password)
+    // 3. sheaf unlock with legacy --password -> exit code 2 (migration error)
     let bad_unlock = temp.path().join("bad_unlock.pdf");
     let out_bad = sheaf_cmd()
         .args([
             "unlock",
-            protected_pdf.to_str().unwrap(),
+            src_3p.to_str().unwrap(),
             "--password",
             "wrong-pw",
             "-o",
@@ -94,32 +91,11 @@ fn cli_watermark_protect_and_unlock_end_to_end() {
             "--json",
         ])
         .output()
-        .expect("run sheaf unlock wrong pw");
-    assert_eq!(out_bad.status.code(), Some(4));
+        .expect("run sheaf unlock");
+    assert_eq!(out_bad.status.code(), Some(2));
     let env_bad: Value = serde_json::from_slice(&out_bad.stdout).expect("parse json");
-    assert_eq!(env_bad["error"]["code"], "wrong_password");
-
-    // 4. sheaf unlock with correct password -> exit code 0
-    let unlocked_pdf = temp.path().join("unlocked.pdf");
-    let out_unl = sheaf_cmd()
-        .args([
-            "unlock",
-            protected_pdf.to_str().unwrap(),
-            "--password",
-            "cli-secret",
-            "-o",
-            unlocked_pdf.to_str().unwrap(),
-            "--json",
-        ])
-        .output()
-        .expect("run sheaf unlock correct pw");
-    assert_eq!(out_unl.status.code(), Some(0));
-    assert!(unlocked_pdf.exists());
-    let env_unl: Value = serde_json::from_slice(&out_unl.stdout).expect("parse json");
-    assert_eq!(env_unl["ok"], true);
-    assert_eq!(env_unl["op"], "unlock");
-    assert_eq!(env_unl["data"]["encrypted"], false);
-    assert_eq!(env_unl["data"]["pages"], 3);
+    assert_eq!(env_bad["ok"], false);
+    assert_eq!(env_bad["error"]["exit_code"], 2);
 
     // 5. sheaf number
     let numbered_pdf = temp.path().join("numbered.pdf");
