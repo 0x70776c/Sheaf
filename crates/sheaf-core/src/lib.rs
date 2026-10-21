@@ -21,6 +21,11 @@ pub use ops::pages::{
     PageOpOptions, PagesReport, delete_pages, extract_pages, get_effective_page_rotation,
     normalize_rotation_degrees, reorder_pages, rotate_pages,
 };
+pub use ops::render::{
+    DEFAULT_RENDER_DPI, DEFAULT_THUMBNAIL_WIDTH_PX, RenderOptions, RenderReport, RenderScale,
+    RenderedPageOutput, default_thumbnail_cache_dir, is_pdfium_available, render_page,
+    render_thumbnails, render_with_options, thumbnail_cache_key,
+};
 pub use ops::split::{PageSelection, SplitMode, SplitOptions, SplitOutput, SplitReport, split};
 pub use ops::verify::{VerifyFileResult, VerifyOptions, VerifyReport, verify};
 pub use progress::{NoProgress, Progress};

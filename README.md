@@ -9,7 +9,7 @@ No cloud uploads, no accounts, no telemetry. Original files are never modified.
 
 ```
 crates/
-├─ sheaf-core   # Pure PDF manipulation library (lopdf), zero UI dependencies
+├─ sheaf-core   # Pure PDF manipulation & rendering library (lopdf, pdfium-render), zero UI dependencies
 └─ sheaf-cli    # Agent- and script-friendly CLI (`sheaf`) with JSON envelope & atomic writes
 tests/
 └─ fixtures     # Curated and programmatically generated PDF test fixtures
@@ -26,6 +26,13 @@ tests/
 
 ### Prerequisites
 - **Rust** (stable toolchain, 1.85+ / Edition 2024)
+- **PDFium (`libpdfium.dylib`)** *(used for page rendering and thumbnail generation via `pdfium-render`)*:
+  ```bash
+  mkdir -p vendor/pdfium
+  curl -sSL https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz \
+    | tar -xz -C vendor/pdfium
+  ```
+  *(You can also point `PDFIUM_LIB_PATH` to any custom `libpdfium.dylib` location.)*
 - **qpdf** *(optional, used for deep PDF structural validation via `sheaf verify --deep` and test suites)*:
   ```bash
   brew install qpdf
@@ -114,7 +121,21 @@ sheaf pages extract report.pdf --pages "1,4-6" -o subset.pdf --json
 
 ---
 
-### 4. `sheaf info`
+### 4. `sheaf render`
+Render PDF pages to PNG images or thumbnails using PDFium (`pdfium-render`).
+When rendering by `--width`, rendered thumbnails are automatically cached on disk keyed by `(path, mtime, size, page, width_px)` (disable with `--no-cache`).
+
+```bash
+# Render a single page at 150 DPI to a PNG file
+sheaf render report.pdf --page 1 --dpi 150 -o page1.png
+
+# Render the first 20 pages as 160 px wide thumbnails into a directory
+sheaf render report.pdf --pages "1-20" --width 160 -o thumbs/ --json
+```
+
+---
+
+### 5. `sheaf info`
 Inspect structural properties and metadata (`size_bytes`, `pdf_version`, `pages`, `encrypted`, `metadata`, `has_outlines`, `outline_count`, `first_page_size_pt`). Encrypted PDFs return exit code `0` with `"encrypted": true` and `"pages": null`.
 
 ```bash
@@ -124,7 +145,7 @@ sheaf info a.pdf b.pdf --json
 
 ---
 
-### 5. `sheaf verify`
+### 6. `sheaf verify`
 Verify PDF files for structural integrity (loads cleanly, valid catalog & page tree, resolvable page content streams and resources). With `--deep`, also runs `qpdf --check` when available.
 
 ```bash
@@ -134,7 +155,7 @@ sheaf verify out/*.pdf --deep --json
 
 ---
 
-### 6. `sheaf capabilities`
+### 7. `sheaf capabilities`
 Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`).
 
 ```bash

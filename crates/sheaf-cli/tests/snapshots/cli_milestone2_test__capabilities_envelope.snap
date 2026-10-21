@@ -1,5 +1,6 @@
 ---
 source: crates/sheaf-cli/tests/cli_milestone2_test.rs
+assertion_line: 520
 expression: cap_val
 ---
 {
@@ -35,6 +36,19 @@ expression: cap_val
           "-o"
         ],
         "name": "pages",
+        "status": "stable"
+      },
+      {
+        "args": [
+          "input",
+          "--page",
+          "--pages",
+          "--dpi",
+          "--width",
+          "--no-cache",
+          "-o"
+        ],
+        "name": "render",
         "status": "stable"
       },
       {

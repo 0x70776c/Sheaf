@@ -7,9 +7,12 @@ authors.workspace = true
 description = "Core PDF manipulation engine for Sheaf"
 
 [dependencies]
+image = "0.25.10"
 lopdf = "0.46.0"
+pdfium-render = "0.9.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+sha2 = "0.11.1"
 thiserror = "2.0.21"
 
 [dev-dependencies]

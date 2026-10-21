@@ -83,6 +83,19 @@ pub fn capabilities() -> CapabilitiesReport {
             status: "stable",
         },
         CommandCapability {
+            name: "render",
+            args: vec![
+                "input",
+                "--page",
+                "--pages",
+                "--dpi",
+                "--width",
+                "--no-cache",
+                "-o",
+            ],
+            status: "stable",
+        },
+        CommandCapability {
             name: "info",
             args: vec!["file..."],
             status: "stable",

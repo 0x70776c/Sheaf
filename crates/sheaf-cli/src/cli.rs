@@ -80,6 +80,12 @@ pub enum Commands {
     )]
     Pages(PagesArgs),
 
+    /// Render PDF pages to PNG images or thumbnails
+    #[command(
+        after_help = "Examples:\n  sheaf render report.pdf --page 1 --dpi 150 -o page1.png\n  sheaf render report.pdf --pages \"1-20\" --width 160 -o thumbs/ --json"
+    )]
+    Render(RenderArgs),
+
     /// Inspect structural properties and metadata of PDF files
     #[command(after_help = "Examples:\n  sheaf info document.pdf\n  sheaf info a.pdf b.pdf --json")]
     Info(InfoArgs),
@@ -226,6 +232,36 @@ pub struct PagesExtractArgs {
     pub pages: String,
 
     /// Target output PDF file (defaults to {stem}_extracted.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct RenderArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Single 1-based page number to render
+    #[arg(long, conflicts_with = "pages")]
+    pub page: Option<u32>,
+
+    /// Page ranges to render (e.g. "1-3,5,8-"; omit both --page and --pages to render all pages)
+    #[arg(long, conflicts_with = "page")]
+    pub pages: Option<String>,
+
+    /// Target resolution in dots per inch (default: 150 DPI if --width is not set)
+    #[arg(long, conflicts_with = "width")]
+    pub dpi: Option<u32>,
+
+    /// Target width in pixels (aspect ratio preserved; uses on-disk thumbnail cache by default)
+    #[arg(long, conflicts_with = "dpi")]
+    pub width: Option<u32>,
+
+    /// Disable the on-disk thumbnail cache when rendering by --width
+    #[arg(long)]
+    pub no_cache: bool,
+
+    /// Output PNG file (when rendering a single page) or output directory
     #[arg(short, long)]
     pub out: Option<PathBuf>,
 }

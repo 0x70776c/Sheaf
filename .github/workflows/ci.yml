@@ -21,6 +21,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install qpdf for PDF validation
         run: brew install qpdf
+      - name: Download PDFium binary for macOS
+        run: |
+          mkdir -p vendor/pdfium
+          curl -sL "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz" | tar -xzf - -C vendor/pdfium
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run Clippy

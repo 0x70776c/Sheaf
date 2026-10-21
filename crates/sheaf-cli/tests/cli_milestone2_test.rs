@@ -485,7 +485,15 @@ fn cli_dry_run_writes_no_files_and_matches_plan() {
 
 #[test]
 fn cli_subcommands_help_contain_examples() {
-    for sub in ["merge", "split", "pages", "info", "verify", "capabilities"] {
+    for sub in [
+        "merge",
+        "split",
+        "pages",
+        "render",
+        "info",
+        "verify",
+        "capabilities",
+    ] {
         sheaf_cmd()
             .args([sub, "--help"])
             .assert()
