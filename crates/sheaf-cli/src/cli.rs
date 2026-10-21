@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
 /// Progress reporting mode on `stderr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -50,7 +50,7 @@ pub struct GlobalArgs {
     name = "sheaf",
     version,
     about = "Schnelles, 100 % offline arbeitendes PDF-Toolkit für macOS",
-    after_help = "Beispiele:\n  sheaf merge a.pdf b.pdf -o combined.pdf\n  sheaf info report.pdf --json"
+    after_help = "Beispiele:\n  sheaf merge a.pdf b.pdf -o combined.pdf\n  sheaf split report.pdf --ranges \"1-3,8-\" -o out/\n  sheaf info report.pdf --json"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -67,6 +67,12 @@ pub enum Commands {
         after_help = "Beispiele:\n  sheaf merge a.pdf b.pdf -o out.pdf\n  sheaf merge teil1.pdf teil2.pdf -o gesamt.pdf --force --json"
     )]
     Merge(MergeArgs),
+
+    /// Eine PDF-Datei nach Seitenbereichen, Blöcken oder Lesezeichen aufteilen
+    #[command(
+        after_help = "Beispiele:\n  sheaf split report.pdf --ranges \"1-3,5,8-\" -o out/\n  sheaf split report.pdf --every 2 -o out/\n  sheaf split report.pdf --bookmarks-level 1 -o out/ --json"
+    )]
+    Split(SplitArgs),
 
     /// Struktur- und Metadaten-Informationen zu PDF-Dateien anzeigen
     #[command(
@@ -94,6 +100,37 @@ pub struct MergeArgs {
     /// Ausgabedatei
     #[arg(short, long)]
     pub out: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
+#[command(group(
+    ArgGroup::new("split_mode")
+        .required(true)
+        .args(["ranges", "every", "bookmarks_level"])
+))]
+pub struct SplitArgs {
+    /// Eingabe-PDF-Datei
+    pub input: PathBuf,
+
+    /// Seitenbereiche (z. B. "1-3,5,8-")
+    #[arg(long)]
+    pub ranges: Option<String>,
+
+    /// Alle N Seiten aufteilen
+    #[arg(long)]
+    pub every: Option<u32>,
+
+    /// Nach Lesezeichen auf Ebene N aufteilen (1 = oberste Ebene)
+    #[arg(long)]
+    pub bookmarks_level: Option<u8>,
+
+    /// Ausgewählte Seitenbereiche in einer einzigen Datei zusammenfassen (nur mit --ranges)
+    #[arg(long, requires = "ranges")]
+    pub combine: bool,
+
+    /// Zielverzeichnis für die erzeugten PDF-Dateien (Standard: Ordner der Eingabedatei)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]

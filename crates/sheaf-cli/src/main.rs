@@ -87,6 +87,7 @@ fn main() -> ExitCode {
 
     let code = match &cli.command {
         Commands::Merge(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Split(args) => execute_command(args, &cli.global, cancelled),
         Commands::Info(args) => execute_command(args, &cli.global, cancelled),
         Commands::Verify(args) => execute_command(args, &cli.global, cancelled),
         Commands::Capabilities(args) => execute_command(args, &cli.global, cancelled),
