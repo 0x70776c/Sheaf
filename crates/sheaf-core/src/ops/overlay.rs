@@ -721,18 +721,9 @@ pub fn preview_overlay_page(
     let (rgb, _) = parse_overlay_color(color)?;
 
     let raw_bytes = std::fs::read(src)?;
-    let mut doc = Document::load_mem(&raw_bytes).map_err(|e| {
-        let msg = e.to_string();
-        if msg.to_ascii_lowercase().contains("encrypt") {
-            SheafError::Encrypted
-        } else {
-            SheafError::InvalidPdf(format!("{}: {msg}", src.display()))
-        }
-    })?;
-
-    if doc.is_encrypted() || doc.trailer.get(b"Encrypt").is_ok() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded =
+        crate::load::load_pdf_from_bytes(&raw_bytes, src, &crate::load::LoadOptions::none())?;
+    let mut doc = loaded.doc;
 
     let pages_map = doc.get_pages();
     let total = pages_map.len() as u32;

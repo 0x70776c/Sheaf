@@ -15,10 +15,12 @@ use image::{ColorType, DynamicImage, ExtendedColorType, ImageEncoder, ImageReade
 use lopdf::content::{Content, Operation};
 use lopdf::{Bookmark, Dictionary, Document, Object, ObjectId, Stream, dictionary};
 use pdfium_render::prelude::*;
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf, load_pdf_from_bytes};
 use crate::ops::render::get_pdfium;
 use crate::ops::split::{PageSelection, sanitize_stem};
 use crate::{Progress, SheafError};
@@ -122,6 +124,8 @@ impl ConvertPageSize {
 /// Options for [`pdf_to_images`].
 #[derive(Debug, Clone)]
 pub struct PdfToImagesOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// Output image format (`png` or `jpg`).
     pub format: ImageFormat,
     /// Target rendering resolution in dots per inch (`18..=1200`, default `150`).
@@ -141,6 +145,7 @@ pub struct PdfToImagesOptions {
 impl Default for PdfToImagesOptions {
     fn default() -> Self {
         Self {
+            load: LoadOptions::default(),
             format: ImageFormat::Png,
             dpi: 150,
             quality: 85,
@@ -219,6 +224,8 @@ pub struct ImagesToPdfReport {
 /// Options for [`pdf_to_markdown`].
 #[derive(Debug, Clone, Default)]
 pub struct PdfToMarkdownOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// Optional 1-based page selection (`None` extracts all pages).
     pub pages: Option<String>,
     /// Target `.md` file path (defaults to `{stem}.md` next to the source PDF).
@@ -358,7 +365,7 @@ pub fn pdf_to_images(
     ensure_not_overwriting_inputs(&[src.to_path_buf()], &out_dir)?;
 
     let pdfium = get_pdfium()?;
-    let doc = load_pdfium_doc(pdfium, src)?;
+    let doc = load_pdfium_doc(pdfium, src, &opts.load)?;
     let total_pages = u32::try_from(doc.pages().len()).unwrap_or(0);
     if total_pages == 0 {
         return Err(SheafError::InvalidPdf(format!(
@@ -690,18 +697,8 @@ pub fn pdf_to_markdown(
     }
 
     let raw_bytes = fs::read(src)?;
-    let doc = Document::load_mem(&raw_bytes).map_err(|e| {
-        let msg = e.to_string();
-        if msg.to_ascii_lowercase().contains("encrypt") {
-            SheafError::Encrypted
-        } else {
-            SheafError::InvalidPdf(format!("{}: {msg}", src.display()))
-        }
-    })?;
-
-    if doc.is_encrypted() || doc.trailer.get(b"Encrypt").is_ok() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded = load_pdf_from_bytes(&raw_bytes, src, &opts.load)?;
+    let doc = loaded.doc;
 
     let pages_map = doc.get_pages();
     let total_pages = pages_map.len() as u32;
@@ -882,20 +879,25 @@ pub fn markdown_to_pdf(
     })
 }
 
-fn load_pdfium_doc<'a>(pdfium: &'a Pdfium, src: &Path) -> Result<PdfDocument<'a>, SheafError> {
-    match pdfium.load_pdf_from_file(src, None) {
+fn load_pdfium_doc<'a>(
+    pdfium: &'a Pdfium,
+    src: &Path,
+    load_opts: &LoadOptions,
+) -> Result<PdfDocument<'a>, SheafError> {
+    let pw_str = load_opts.password.as_ref().map(|s| s.expose_secret());
+    match pdfium.load_pdf_from_file(src, pw_str) {
         Ok(doc) => Ok(doc),
         Err(err) => {
-            if let Ok(lopdf_doc) = Document::load(src)
-                && (lopdf_doc.is_encrypted() || lopdf_doc.trailer.get(b"Encrypt").is_ok())
-            {
-                return Err(SheafError::Encrypted);
-            }
+            load_pdf(src, load_opts)?;
             let err_str = err.to_string();
             if err_str.to_ascii_lowercase().contains("password")
                 || err_str.to_ascii_lowercase().contains("encrypt")
             {
-                return Err(SheafError::Encrypted);
+                if pw_str.is_some() {
+                    return Err(SheafError::WrongPassword);
+                } else {
+                    return Err(SheafError::Encrypted);
+                }
             }
             Err(SheafError::InvalidPdf(format!(
                 "{}: PDFium failed to load document: {err_str}",

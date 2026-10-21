@@ -11,8 +11,12 @@ impl Command for NumberArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
+        let mut resolver = crate::password::PasswordResolver::new();
+        let pw = resolver.resolve_open_password(&self.password_opts)?;
+        let load_opts = sheaf_core::LoadOptions { password: pw };
         let position = NumberPosition::parse(&self.position)?;
         let opts = NumberOptions {
+            load: load_opts,
             format: self.format.clone(),
             position,
             start: self.start,
@@ -29,7 +33,7 @@ impl Command for NumberArgs {
 
         Ok(Outcome {
             report,
-            warnings: Vec::new(),
+            warnings: resolver.warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })

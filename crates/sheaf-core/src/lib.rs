@@ -7,6 +7,7 @@
 
 mod error;
 pub mod fs;
+pub mod load;
 pub mod ops;
 mod progress;
 
@@ -14,6 +15,7 @@ mod progress;
 pub const SCHEMA_VERSION: u32 = 1;
 
 pub use error::SheafError;
+pub use load::{LoadOptions, LoadedPdf, load_pdf, load_pdf_from_bytes};
 pub use ops::capabilities::{
     ArgumentCapability, CapabilitiesReport, CommandCapability, capabilities, default_exit_codes,
 };
@@ -26,7 +28,7 @@ pub use ops::convert::{
     PdfToImagesReport, PdfToMarkdownOptions, PdfToMarkdownReport, images_to_pdf, markdown_to_pdf,
     pdf_to_images, pdf_to_markdown,
 };
-pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
+pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info, info_with_options};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
 pub use ops::number::{NumberOptions, NumberPosition, NumberReport, format_page_number, number};
 pub use ops::overlay::{

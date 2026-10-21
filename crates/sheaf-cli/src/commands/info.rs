@@ -1,9 +1,11 @@
 use std::fmt::Write as _;
 
-use sheaf_core::{InfoReport, SheafError, info};
+use sheaf_core::ops::info::info_with_options;
+use sheaf_core::{InfoReport, SheafError};
 
 use crate::cli::InfoArgs;
 use crate::commands::{Command, Ctx, Outcome};
+use crate::password::PasswordResolver;
 
 impl Command for InfoArgs {
     type Report = InfoReport;
@@ -13,7 +15,8 @@ impl Command for InfoArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
-        let report = info(&self.files, &ctx.progress)?;
+        let load_opts = PasswordResolver::new().resolve_load_options(&self.password_opts)?;
+        let report = info_with_options(&self.files, &load_opts, &ctx.progress)?;
         Ok(Outcome {
             report,
             warnings: Vec::new(),

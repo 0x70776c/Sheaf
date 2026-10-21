@@ -24,10 +24,12 @@ impl Command for ProtectArgs {
         }
 
         let mut resolver = PasswordResolver::new();
+        let load_opts = resolver.resolve_load_options(&self.password_opts)?;
         let user_password = resolver.resolve_new_user_password(&self.new_password)?;
         let owner_password = resolver.resolve_new_owner_password(&self.new_password)?;
 
         let opts = ProtectOptions {
+            load: load_opts,
             user_password,
             owner_password,
             allow_print: !self.no_print,

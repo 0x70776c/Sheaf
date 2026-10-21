@@ -9,11 +9,13 @@ use std::time::UNIX_EPOCH;
 use image::ImageEncoder;
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use pdfium_render::prelude::*;
+use secrecy::ExposeSecret;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::LoadOptions;
 use crate::ops::split::PageSelection;
 use crate::{Progress, SheafError};
 
@@ -37,6 +39,8 @@ pub enum RenderScale {
 /// Options for [`render_with_options`].
 #[derive(Debug, Clone)]
 pub struct RenderOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// 1-based page selection (`None` renders all pages in the document).
     pub pages: Option<String>,
     /// Target scaling mode (pixel width or DPI).
@@ -172,6 +176,20 @@ fn map_pdfium_error(err: PdfiumError, path: &Path) -> SheafError {
         ),
         other => SheafError::InvalidPdf(format!("{}: {other}", path.display())),
     }
+}
+
+fn map_pdfium_load_error(err: PdfiumError, path: &Path, had_password: bool) -> SheafError {
+    if let PdfiumError::PdfiumLibraryInternalError(
+        PdfiumInternalError::PasswordError | PdfiumInternalError::SecurityError,
+    ) = &err
+    {
+        if had_password {
+            return SheafError::WrongPassword;
+        } else {
+            return SheafError::Encrypted;
+        }
+    }
+    map_pdfium_error(err, path)
 }
 
 fn validate_width_px(width_px: u32) -> Result<i32, SheafError> {
@@ -329,7 +347,7 @@ pub fn render_page(src: &Path, page: u32, width_px: u32) -> Result<Vec<u8>, Shea
     let pdfium = get_pdfium()?;
     let doc = pdfium
         .load_pdf_from_file(src, None)
-        .map_err(|e| map_pdfium_error(e, src))?;
+        .map_err(|e| map_pdfium_load_error(e, src, false))?;
 
     let total = u32::try_from(doc.pages().len()).unwrap_or(0);
     if page == 0 || page > total {
@@ -539,9 +557,10 @@ pub fn render_thumbnails(
 ///
 /// ```no_run
 /// use std::path::{Path, PathBuf};
-/// use sheaf_core::{NoProgress, RenderOptions, RenderScale, render_with_options};
+/// use sheaf_core::{LoadOptions, NoProgress, RenderOptions, RenderScale, render_with_options};
 ///
 /// let opts = RenderOptions {
+///     load: LoadOptions::none(),
 ///     pages: Some("1-2".to_string()),
 ///     scale: RenderScale::WidthPx(160),
 ///     out: PathBuf::from("thumbs"),
@@ -574,10 +593,11 @@ pub fn render_with_options(
         }
     }
 
+    let pw_str = opts.load.password.as_ref().map(|s| s.expose_secret());
     let pdfium = get_pdfium()?;
     let doc = pdfium
-        .load_pdf_from_file(src, None)
-        .map_err(|e| map_pdfium_error(e, src))?;
+        .load_pdf_from_file(src, pw_str)
+        .map_err(|e| map_pdfium_load_error(e, src, pw_str.is_some()))?;
 
     let total_pages = u32::try_from(doc.pages().len()).unwrap_or(0);
     if total_pages == 0 {
@@ -635,7 +655,7 @@ pub fn render_with_options(
         }
     }
 
-    let resolved_cache_dir = if opts.use_cache {
+    let resolved_cache_dir = if opts.use_cache && pw_str.is_none() {
         let dir = opts
             .cache_dir
             .clone()

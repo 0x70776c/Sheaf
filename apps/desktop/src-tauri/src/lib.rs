@@ -15,14 +15,14 @@ use serde::Serialize;
 use sheaf_core::{
     CapabilitiesReport, CompressOptions, CompressPreset, CompressReport, ConvertPageSize,
     ConvertReport, DEFAULT_THUMBNAIL_WIDTH_PX, ImageFormat, ImagesToPdfOptions, InfoReport,
-    MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, NumberOptions, NumberPosition,
-    NumberReport, OverlayPosition, PageOpOptions, PageSelection, PagesReport, PdfToImagesOptions,
-    PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport, SheafError, SplitMode,
-    SplitOptions, SplitReport, UnlockOptions, WatermarkOptions, WatermarkPosition, WatermarkReport,
-    capabilities, compress_with_options, delete_pages, extract_pages, format_page_number,
-    images_to_pdf, info, markdown_to_pdf, merge_with_options, number, pdf_to_images,
-    pdf_to_markdown, preview_overlay_page, protect, render_thumbnails, reorder_pages, rotate_pages,
-    split, unlock, watermark,
+    LoadOptions, MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, NumberOptions,
+    NumberPosition, NumberReport, OverlayPosition, PageOpOptions, PageSelection, PagesReport,
+    PdfToImagesOptions, PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport, SheafError,
+    SplitMode, SplitOptions, SplitReport, UnlockOptions, WatermarkOptions, WatermarkPosition,
+    WatermarkReport, capabilities, compress_with_options, delete_pages, extract_pages,
+    format_page_number, images_to_pdf, info, markdown_to_pdf, merge_with_options, number,
+    pdf_to_images, pdf_to_markdown, preview_overlay_page, protect, render_thumbnails,
+    reorder_pages, rotate_pages, split, unlock, watermark,
 };
 use tauri::{AppHandle, Emitter, State};
 
@@ -155,6 +155,7 @@ pub fn execute_merge_op(
         _ => default_merged_path(first),
     };
     let opts = MergeOptions {
+        load: LoadOptions::default(),
         force,
         dry_run: false,
     };
@@ -199,6 +200,7 @@ pub fn execute_split_op(
 
     let target_dir = out_dir.map(Path::to_path_buf).unwrap_or_default();
     let opts = SplitOptions {
+        load: LoadOptions::default(),
         mode: split_mode,
         out_dir: target_dir,
         force,
@@ -218,6 +220,7 @@ pub fn execute_pages_op(
     progress: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
     let opts = PageOpOptions {
+        load: LoadOptions::default(),
         out: out
             .filter(|p| !p.as_os_str().is_empty())
             .map(Path::to_path_buf),
@@ -275,6 +278,7 @@ pub fn execute_compress_op(
 ) -> Result<CompressReport, SheafError> {
     let parsed_preset = CompressPreset::parse(preset)?;
     let opts = CompressOptions {
+        load: LoadOptions::default(),
         preset: parsed_preset,
         grayscale,
         out: out
@@ -314,6 +318,7 @@ pub fn execute_convert_op(
             let src = inputs.first().ok_or(SheafError::EmptySelection)?;
             let fmt = ImageFormat::parse(format.unwrap_or("png"))?;
             let opts = PdfToImagesOptions {
+                load: LoadOptions::default(),
                 format: fmt,
                 dpi: dpi.unwrap_or(150),
                 quality: quality.unwrap_or(85),
@@ -353,6 +358,7 @@ pub fn execute_convert_op(
         "to-markdown" => {
             let src = inputs.first().ok_or(SheafError::EmptySelection)?;
             let opts = PdfToMarkdownOptions {
+                load: LoadOptions::default(),
                 pages: clean_pages,
                 out: clean_out,
                 force,
@@ -399,6 +405,7 @@ pub fn execute_watermark_op(
 ) -> Result<WatermarkReport, SheafError> {
     let pos = WatermarkPosition::parse(position)?;
     let opts = WatermarkOptions {
+        load: LoadOptions::default(),
         text: text.to_string(),
         position: pos,
         font_size,
@@ -436,6 +443,7 @@ pub fn execute_number_op(
 ) -> Result<NumberReport, SheafError> {
     let pos = NumberPosition::parse(position)?;
     let opts = NumberOptions {
+        load: LoadOptions::default(),
         format: format.to_string(),
         position: pos,
         start,
@@ -476,6 +484,7 @@ pub fn execute_protect_op(
     match action {
         "protect" => {
             let opts = ProtectOptions {
+                load: LoadOptions::default(),
                 user_password: secrecy::SecretString::from(password.to_string()),
                 owner_password: owner_password
                     .map(str::trim)

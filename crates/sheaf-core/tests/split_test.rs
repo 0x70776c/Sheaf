@@ -7,7 +7,9 @@ use lopdf::content::{Content, Operation};
 use lopdf::{Bookmark, Document, Object, Stream, dictionary};
 use proptest::prelude::*;
 use sheaf_core::fs::write_atomic;
-use sheaf_core::{NoProgress, PageSelection, SheafError, SplitMode, SplitOptions, split};
+use sheaf_core::{
+    LoadOptions, NoProgress, PageSelection, SheafError, SplitMode, SplitOptions, split,
+};
 
 static INIT_SPLIT_FIXTURES: Once = Once::new();
 
@@ -278,6 +280,7 @@ fn split_by_ranges_separate_and_combine() {
     let out_sep = temp.path().join("sep");
     let sel = PageSelection::parse("1-3, 5, 8-, 2-4", 12).expect("parse");
     let opts = SplitOptions {
+        load: LoadOptions::none(),
         mode: SplitMode::Ranges {
             selection: sel,
             combine: false,
@@ -312,6 +315,7 @@ fn split_by_ranges_separate_and_combine() {
     let out_comb = temp.path().join("comb");
     let sel_comb = PageSelection::parse("1-3, 5, 2-3", 12).expect("parse");
     let opts_comb = SplitOptions {
+        load: LoadOptions::none(),
         mode: SplitMode::Ranges {
             selection: sel_comb,
             combine: true,
@@ -343,6 +347,7 @@ fn split_every_n_sum_equals_original() {
     let temp = tempfile::tempdir().expect("tempdir");
 
     let opts = SplitOptions {
+        load: LoadOptions::none(),
         mode: SplitMode::EveryN(5),
         out_dir: temp.path().to_path_buf(),
         force: false,
@@ -374,6 +379,7 @@ fn split_by_bookmarks_level_1_and_level_2() {
     // Level 1: front (p1) + 3 chapters (p2-5, p6-9, p10-12)
     let out_l1 = temp.path().join("l1");
     let opts_l1 = SplitOptions {
+        load: LoadOptions::none(),
         mode: SplitMode::ByBookmarks { level: 1 },
         out_dir: out_l1,
         force: false,
@@ -401,6 +407,7 @@ fn split_by_bookmarks_level_1_and_level_2() {
     // Level 2: front (p1) + 6 subchapters (p2-3, p4-5, p6-7, p8-9, p10-10, p11-12)
     let out_l2 = temp.path().join("l2");
     let opts_l2 = SplitOptions {
+        load: LoadOptions::none(),
         mode: SplitMode::ByBookmarks { level: 2 },
         out_dir: out_l2,
         force: false,

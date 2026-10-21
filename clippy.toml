@@ -1,0 +1,12 @@
+disallowed-methods = [
+    { path = "lopdf::Document::load", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_with_options", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_with_password", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_filtered", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_from", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_from_with_options", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_from_with_password", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_mem", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_mem_with_options", reason = "Use sheaf_core::load::load_pdf instead" },
+    { path = "lopdf::Document::load_mem_with_password", reason = "Use sheaf_core::load::load_pdf instead" },
+]

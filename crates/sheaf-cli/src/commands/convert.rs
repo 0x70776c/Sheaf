@@ -17,8 +17,12 @@ impl Command for ConvertArgs {
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
         let report = match &self.action {
             ConvertSubcommand::ToImages(args) => {
+                let mut resolver = crate::password::PasswordResolver::new();
+                let pw = resolver.resolve_open_password(&args.password_opts)?;
+                let load_opts = sheaf_core::LoadOptions { password: pw };
                 let format = ImageFormat::parse(&args.format)?;
                 let opts = PdfToImagesOptions {
+                    load: load_opts,
                     format,
                     dpi: args.dpi,
                     quality: args.quality,
@@ -41,7 +45,11 @@ impl Command for ConvertArgs {
                 ConvertReport::FromImages(images_to_pdf(&args.inputs, &opts, &ctx.progress)?)
             }
             ConvertSubcommand::ToMarkdown(args) => {
+                let mut resolver = crate::password::PasswordResolver::new();
+                let pw = resolver.resolve_open_password(&args.password_opts)?;
+                let load_opts = sheaf_core::LoadOptions { password: pw };
                 let opts = PdfToMarkdownOptions {
+                    load: load_opts,
                     pages: args.pages.clone(),
                     out: args.out.clone(),
                     force: ctx.global.force,

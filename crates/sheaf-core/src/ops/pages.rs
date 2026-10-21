@@ -8,12 +8,15 @@ use serde::Serialize;
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf};
 use crate::ops::split::{build_subset_document, sanitize_stem};
 use crate::{PageSelection, Progress, SheafError};
 
 /// Options for page-level operations (`rotate`, `delete`, `reorder`, `extract`).
 #[derive(Debug, Clone, Default)]
 pub struct PageOpOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// Target output PDF file path. If empty, defaults to `{stem}_{suffix}.pdf` in the source directory.
     pub out: Option<PathBuf>,
     /// Overwrite existing output file if `true`.
@@ -102,7 +105,7 @@ pub fn rotate_pages(
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
     let delta = normalize_rotation_degrees(degrees)?;
-    let (mut doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (mut doc, pages_map, total_pages) = load_source_pdf(src, opts, p)?;
 
     let target_pages = match selection {
         Some(sel) => validate_and_dedup_selection(sel, total_pages)?,
@@ -193,7 +196,7 @@ pub fn delete_pages(
     opts: &PageOpOptions,
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
-    let (doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (doc, pages_map, total_pages) = load_source_pdf(src, opts, p)?;
     let to_delete = validate_and_dedup_selection(selection, total_pages)?;
     let delete_set: HashSet<u32> = to_delete.iter().copied().collect();
 
@@ -281,7 +284,7 @@ pub fn reorder_pages(
     opts: &PageOpOptions,
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
-    let (doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (doc, pages_map, total_pages) = load_source_pdf(src, opts, p)?;
     let page_sequence = validate_sequence_selection(order, total_pages)?;
 
     let out_path = resolve_output_path(src, opts.out.as_deref(), "reordered");
@@ -355,7 +358,7 @@ pub fn extract_pages(
     opts: &PageOpOptions,
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
-    let (doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (doc, pages_map, total_pages) = load_source_pdf(src, opts, p)?;
     let extracted_sequence = validate_sequence_selection(selection, total_pages)?;
 
     let out_path = resolve_output_path(src, opts.out.as_deref(), "extracted");
@@ -404,22 +407,14 @@ pub fn extract_pages(
 
 fn load_source_pdf(
     src: &Path,
+    opts: &PageOpOptions,
     p: &dyn Progress,
 ) -> Result<(Document, BTreeMap<u32, ObjectId>, u32), SheafError> {
     if p.is_cancelled() {
         return Err(SheafError::Cancelled);
     }
-    if !src.exists() {
-        return Err(SheafError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("File not found: {}", src.display()),
-        )));
-    }
-
-    let doc = Document::load(src).map_err(|e| SheafError::from_lopdf_with_path(e, src))?;
-    if doc.is_encrypted() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded = load_pdf(src, &opts.load)?;
+    let doc = loaded.doc;
 
     let pages_map = doc.get_pages();
     if pages_map.is_empty() {

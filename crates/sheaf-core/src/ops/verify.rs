@@ -3,14 +3,16 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use lopdf::Document;
 use serde::Serialize;
 
+use crate::load::{LoadOptions, load_pdf};
 use crate::{Progress, SheafError};
 
 /// Options for PDF verification.
 #[derive(Debug, Clone, Default)]
 pub struct VerifyOptions {
+    /// Loading and decryption options for input PDFs.
+    pub load: LoadOptions,
     /// Run `qpdf --check` in addition to structural `lopdf` checks when available.
     pub deep: bool,
 }
@@ -130,7 +132,7 @@ pub fn verify(
         if p.is_cancelled() {
             return Err(SheafError::Cancelled);
         }
-        results.push(verify_single_file(path, qpdf_bin));
+        results.push(verify_single_file(path, qpdf_bin, &opts.load));
         p.report((idx as u64) + 1, total);
     }
 
@@ -140,11 +142,33 @@ pub fn verify(
     })
 }
 
-fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
+fn verify_single_file(
+    path: &Path,
+    qpdf_bin: Option<&str>,
+    load_opts: &LoadOptions,
+) -> VerifyFileResult {
     let mut problems = Vec::new();
 
-    let doc = match Document::load(path) {
-        Ok(d) => d,
+    let doc = match load_pdf(path, load_opts) {
+        Ok(loaded) => loaded.doc,
+        Err(SheafError::Encrypted) => {
+            problems.push("Document is encrypted (password required).".to_string());
+            return VerifyFileResult {
+                path: path.to_path_buf(),
+                valid: false,
+                pages: None,
+                problems,
+            };
+        }
+        Err(SheafError::WrongPassword) => {
+            problems.push("Incorrect password.".to_string());
+            return VerifyFileResult {
+                path: path.to_path_buf(),
+                valid: false,
+                pages: None,
+                problems,
+            };
+        }
         Err(e) => {
             problems.push(format!("Failed to load PDF: {e}"));
             return VerifyFileResult {
@@ -155,16 +179,6 @@ fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
             };
         }
     };
-
-    if doc.is_encrypted() {
-        problems.push("Document is encrypted.".to_string());
-        return VerifyFileResult {
-            path: path.to_path_buf(),
-            valid: false,
-            pages: None,
-            problems,
-        };
-    }
 
     if let Err(e) = doc.catalog() {
         problems.push(format!("Catalog missing or invalid: {e}"));

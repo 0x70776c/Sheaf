@@ -4,10 +4,10 @@ use image::GenericImageView;
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, Stream, StringFormat, dictionary};
 use sheaf_core::{
-    NoProgress, NumberOptions, NumberPosition, OverlayPosition, PageOverlaySpec, RenderOptions,
-    RenderScale, SheafError, WatermarkOptions, WatermarkPosition, apply_overlay_to_page,
-    format_page_number, get_effective_page_box, is_pdfium_available, number, render_with_options,
-    watermark,
+    LoadOptions, NoProgress, NumberOptions, NumberPosition, OverlayPosition, PageOverlaySpec,
+    RenderOptions, RenderScale, SheafError, WatermarkOptions, WatermarkPosition,
+    apply_overlay_to_page, format_page_number, get_effective_page_box, is_pdfium_available, number,
+    render_with_options, watermark,
 };
 use tempfile::TempDir;
 
@@ -417,6 +417,7 @@ fn test_overlay_audit_05_rotate_90_180_270_visual_pixel_check() {
         watermark(&src, &opts, &NoProgress).unwrap();
 
         let render_opts = RenderOptions {
+            load: LoadOptions::none(),
             pages: Some("1".to_string()),
             scale: RenderScale::Dpi(72),
             out: png.clone(),

@@ -11,8 +11,12 @@ impl Command for WatermarkArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
+        let mut resolver = crate::password::PasswordResolver::new();
+        let pw = resolver.resolve_open_password(&self.password_opts)?;
+        let load_opts = sheaf_core::LoadOptions { password: pw };
         let position = WatermarkPosition::parse(&self.position)?;
         let opts = WatermarkOptions {
+            load: load_opts,
             text: self.text.clone(),
             position,
             font_size: self.font_size,
@@ -28,7 +32,7 @@ impl Command for WatermarkArgs {
 
         Ok(Outcome {
             report,
-            warnings: Vec::new(),
+            warnings: resolver.warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })

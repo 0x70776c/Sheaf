@@ -136,27 +136,29 @@ fn ensure_fixtures() -> PathBuf {
             .expect("write corrupted.pdf");
 
         // Fixture 5: encrypted PDF
-        let mut enc_doc = build_sample_pdf("Secret", 1, &[]);
-        // Add deterministic file ID required by V2 encryption
-        enc_doc.trailer.set(
-            "ID",
-            Object::Array(vec![
-                Object::string_literal(b"0123456789abcdef".to_vec()),
-                Object::string_literal(b"0123456789abcdef".to_vec()),
-            ]),
-        );
-        let enc_version = EncryptionVersion::V2 {
-            document: &enc_doc,
-            owner_password: "owner-secret",
-            user_password: "user-secret",
-            key_length: 128,
-            permissions: Permissions::PRINTABLE,
-        };
-        let state = EncryptionState::try_from(enc_version).expect("build encryption state");
-        enc_doc.encrypt(&state).expect("encrypt document");
-        enc_doc
-            .save(dir.join("encrypted.pdf"))
-            .expect("save encrypted.pdf");
+        if !dir.join("encrypted.pdf").exists() {
+            let mut enc_doc = build_sample_pdf("Secret", 1, &[]);
+            // Add deterministic file ID required by V2 encryption
+            enc_doc.trailer.set(
+                "ID",
+                Object::Array(vec![
+                    Object::string_literal(b"0123456789abcdef".to_vec()),
+                    Object::string_literal(b"0123456789abcdef".to_vec()),
+                ]),
+            );
+            let enc_version = EncryptionVersion::V2 {
+                document: &enc_doc,
+                owner_password: "owner-secret",
+                user_password: "user-secret",
+                key_length: 128,
+                permissions: Permissions::PRINTABLE,
+            };
+            let state = EncryptionState::try_from(enc_version).expect("build encryption state");
+            enc_doc.encrypt(&state).expect("encrypt document");
+            enc_doc
+                .save(dir.join("encrypted.pdf"))
+                .expect("save encrypted.pdf");
+        }
     });
     dir
 }

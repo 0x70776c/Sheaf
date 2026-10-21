@@ -3,7 +3,7 @@ use std::process::Command;
 
 use lopdf::Document;
 use sheaf_core::{
-    NoProgress, Progress, ProtectOptions, SheafError, UnlockOptions, WatermarkOptions,
+    LoadOptions, NoProgress, Progress, ProtectOptions, SheafError, UnlockOptions, WatermarkOptions,
     WatermarkPosition, info, protect, unlock, watermark,
 };
 
@@ -68,6 +68,7 @@ fn watermark_all_and_selected_pages_preserves_existing_text() {
     let rep_all = watermark(
         &src,
         &WatermarkOptions {
+            load: LoadOptions::none(),
             text: "CONFIDENTIAL".to_string(),
             position: WatermarkPosition::Diagonal,
             font_size: 48.0,
@@ -97,6 +98,7 @@ fn watermark_all_and_selected_pages_preserves_existing_text() {
     let rep_sub = watermark(
         &src,
         &WatermarkOptions {
+            load: LoadOptions::none(),
             text: "DRAFT COPY".to_string(),
             position: WatermarkPosition::BottomRight,
             font_size: 24.0,
@@ -129,6 +131,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let prot_rep = protect(
         &src,
         &ProtectOptions {
+            load: LoadOptions::none(),
             user_password: secrecy::SecretString::from("user-pass-123"),
             owner_password: Some(secrecy::SecretString::from("owner-pass-456")),
             allow_print: true,
@@ -197,7 +200,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let plain_err = unlock(
         &unlocked_pdf,
         &UnlockOptions {
-            password: "any".to_string(),
+            password: secrecy::SecretString::from("any"),
             out: Some(temp.path().join("plain2.pdf")),
             force: false,
             dry_run: false,

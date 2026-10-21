@@ -70,6 +70,15 @@ impl PasswordResolver {
         )
     }
 
+    /// Resolves [`sheaf_core::LoadOptions`] containing the open password if configured.
+    pub fn resolve_load_options(
+        &mut self,
+        args: &OpenPasswordArgs,
+    ) -> Result<sheaf_core::LoadOptions, SheafError> {
+        let password = self.resolve_open_password(args)?;
+        Ok(sheaf_core::LoadOptions { password })
+    }
+
     /// Resolves the required new user password for `protect`.
     pub fn resolve_new_user_password(
         &mut self,

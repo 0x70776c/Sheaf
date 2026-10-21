@@ -7,8 +7,8 @@ use lopdf::{
     Dictionary, Document, Object, Stream, content::Content, content::Operation, dictionary,
 };
 use sheaf_core::{
-    DEFAULT_THUMBNAIL_WIDTH_PX, NoProgress, RenderOptions, RenderScale, SheafError, render_page,
-    render_thumbnails, render_with_options, thumbnail_cache_key,
+    DEFAULT_THUMBNAIL_WIDTH_PX, LoadOptions, NoProgress, RenderOptions, RenderScale, SheafError,
+    render_page, render_thumbnails, render_with_options, thumbnail_cache_key,
 };
 
 fn fixtures_dir() -> PathBuf {
@@ -186,6 +186,7 @@ fn render_with_options_supports_dpi_width_dry_run_and_force() {
     // 1. Dry-run with DPI
     let out_dir = temp.path().join("out_dpi");
     let dry_opts = RenderOptions {
+        load: LoadOptions::none(),
         pages: Some("1-2".to_string()),
         scale: RenderScale::Dpi(150),
         out: out_dir.clone(),
@@ -203,6 +204,7 @@ fn render_with_options_supports_dpi_width_dry_run_and_force() {
     // 2. Real render of single page to explicit .png path
     let single_png = temp.path().join("page1.png");
     let single_opts = RenderOptions {
+        load: LoadOptions::none(),
         pages: Some("1".to_string()),
         scale: RenderScale::WidthPx(160),
         out: single_png.clone(),

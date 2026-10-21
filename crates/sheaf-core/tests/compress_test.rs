@@ -9,7 +9,7 @@ use lopdf::{
     dictionary,
 };
 use sheaf_core::{
-    CompressOptions, CompressPreset, NoProgress, Progress, SheafError, compress,
+    CompressOptions, CompressPreset, LoadOptions, NoProgress, Progress, SheafError, compress,
     compress_with_options,
 };
 
@@ -283,6 +283,7 @@ fn compress_presets_order_and_grayscale_conversion() {
     let rep_high = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::High,
             grayscale: true,
             out: Some(out_high.clone()),
@@ -351,6 +352,7 @@ fn compress_dry_run_and_error_cases() {
     let dry_rep = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::Medium,
             grayscale: false,
             out: Some(dry_out.clone()),
@@ -369,6 +371,7 @@ fn compress_dry_run_and_error_cases() {
     let err = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::Medium,
             grayscale: false,
             out: Some(existing),
@@ -399,6 +402,7 @@ fn compress_dry_run_and_error_cases() {
     let cancel_err = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::Medium,
             grayscale: false,
             out: Some(cancel_out),

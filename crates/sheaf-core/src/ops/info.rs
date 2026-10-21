@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use lopdf::{Dictionary, Document, Object};
 use serde::Serialize;
 
+use crate::load::{LoadOptions, load_pdf};
 use crate::{Progress, SheafError};
 
 /// Metadata dictionary fields of a PDF document.
@@ -77,6 +78,15 @@ pub struct InfoReport {
 /// assert_eq!(report.files.len(), 1);
 /// ```
 pub fn info(files: &[PathBuf], p: &dyn Progress) -> Result<InfoReport, SheafError> {
+    info_with_options(files, &LoadOptions::none(), p)
+}
+
+/// Inspects one or more local PDF files with specified loading/decryption options.
+pub fn info_with_options(
+    files: &[PathBuf],
+    load_opts: &LoadOptions,
+    p: &dyn Progress,
+) -> Result<InfoReport, SheafError> {
     if files.is_empty() {
         return Err(SheafError::EmptySelection);
     }
@@ -89,27 +99,22 @@ pub fn info(files: &[PathBuf], p: &dyn Progress) -> Result<InfoReport, SheafErro
         if p.is_cancelled() {
             return Err(SheafError::Cancelled);
         }
-        infos.push(inspect_single_file(path)?);
+        infos.push(inspect_single_file(path, load_opts)?);
         p.report((idx as u64) + 1, total);
     }
 
     Ok(InfoReport { files: infos })
 }
 
-fn inspect_single_file(path: &Path) -> Result<FileInfo, SheafError> {
+fn inspect_single_file(path: &Path, load_opts: &LoadOptions) -> Result<FileInfo, SheafError> {
     let fs_meta = std::fs::metadata(path)?;
     let size_bytes = fs_meta.len();
 
-    let doc = Document::load(path).map_err(|e| match e {
-        lopdf::Error::Decryption(_)
-        | lopdf::Error::InvalidPassword
-        | lopdf::Error::AlreadyEncrypted => SheafError::Encrypted,
-        other => SheafError::from_lopdf_with_path(other, path),
-    });
+    let loaded = load_pdf(path, load_opts);
 
-    let doc = match doc {
-        Ok(d) => d,
-        Err(SheafError::Encrypted) => {
+    let (doc, was_encrypted) = match loaded {
+        Ok(l) => (l.doc, l.was_encrypted),
+        Err(SheafError::Encrypted | SheafError::WrongPassword) => {
             let version = read_header_version(path).unwrap_or_else(|| "1.4".to_string());
             return Ok(FileInfo {
                 path: path.to_path_buf(),
@@ -126,7 +131,7 @@ fn inspect_single_file(path: &Path) -> Result<FileInfo, SheafError> {
         Err(e) => return Err(e),
     };
 
-    if doc.is_encrypted() {
+    if was_encrypted && doc.is_encrypted() {
         return Ok(FileInfo {
             path: path.to_path_buf(),
             size_bytes,

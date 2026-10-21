@@ -4,11 +4,11 @@ use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-use lopdf::Document;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf_from_bytes};
 use crate::ops::overlay::{
     OverlayPosition, PageOverlaySpec, apply_overlay_to_page, create_overlay_shared_objects,
     encode_win_ansi, parse_overlay_color,
@@ -90,6 +90,8 @@ impl NumberPosition {
 /// Options for [`number`].
 #[derive(Debug, Clone)]
 pub struct NumberOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// Format template supporting `{n}`, `{total}`, `{page}`, `{pages}` (default `"{n} / {total}"`).
     pub format: String,
     /// Placement on the page (default `BottomCenter`).
@@ -117,6 +119,7 @@ pub struct NumberOptions {
 impl Default for NumberOptions {
     fn default() -> Self {
         Self {
+            load: LoadOptions::default(),
             format: "{n} / {total}".to_string(),
             position: NumberPosition::BottomCenter,
             start: 1,
@@ -313,18 +316,8 @@ pub fn number(
     }
 
     let raw_bytes = fs::read(src)?;
-    let mut doc = Document::load_mem(&raw_bytes).map_err(|e| {
-        let msg = e.to_string();
-        if msg.to_ascii_lowercase().contains("encrypt") {
-            SheafError::Encrypted
-        } else {
-            SheafError::InvalidPdf(format!("{}: {msg}", src.display()))
-        }
-    })?;
-
-    if doc.is_encrypted() || doc.trailer.get(b"Encrypt").is_ok() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded = load_pdf_from_bytes(&raw_bytes, src, &opts.load)?;
+    let mut doc = loaded.doc;
 
     let pages_map = doc.get_pages();
     let total_pages = pages_map.len() as u32;

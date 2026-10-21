@@ -4,19 +4,22 @@ use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-use lopdf::{Document, EncryptionState, EncryptionVersion, LoadOptions, Object, Permissions};
+use lopdf::{Document, EncryptionState, EncryptionVersion, Object, Permissions};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf, load_pdf_from_bytes};
 use crate::ops::split::sanitize_stem;
 use crate::{Progress, SheafError};
 
 /// Options for [`protect`].
 #[derive(Debug, Clone)]
 pub struct ProtectOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// User password required to open the encrypted PDF.
     pub user_password: SecretString,
     /// Optional owner password (defaults to `user_password` when `None`).
@@ -38,6 +41,7 @@ pub struct ProtectOptions {
 impl Default for ProtectOptions {
     fn default() -> Self {
         Self {
+            load: LoadOptions::default(),
             user_password: SecretString::from(""),
             owner_password: None,
             allow_print: true,
@@ -89,7 +93,7 @@ pub struct ProtectReport {
 /// use sheaf_core::{NoProgress, ProtectOptions, protect};
 ///
 /// let opts = ProtectOptions {
-///     user_password: "secret-password".to_string(),
+///     user_password: "secret-password".to_string().into(),
 ///     ..ProtectOptions::default()
 /// };
 /// let report = protect(Path::new("report.pdf"), &opts, &NoProgress).unwrap();
@@ -131,12 +135,8 @@ pub fn protect(
     p.report(10, 100);
 
     let raw_bytes = fs::read(src)?;
-    let mut doc =
-        Document::load_mem(&raw_bytes).map_err(|e| SheafError::from_lopdf_with_path(e, src))?;
-
-    if doc.is_encrypted() || doc.trailer.get(b"Encrypt").is_ok() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded = load_pdf_from_bytes(&raw_bytes, src, &opts.load)?;
+    let mut doc = loaded.doc;
 
     let pages_count = doc.get_pages().len() as u32;
     if pages_count == 0 {
@@ -215,7 +215,7 @@ pub fn protect(
 /// use sheaf_core::{NoProgress, UnlockOptions, unlock};
 ///
 /// let opts = UnlockOptions {
-///     password: "secret-password".to_string(),
+///     password: "secret-password".to_string().into(),
 ///     ..UnlockOptions::default()
 /// };
 /// let report = unlock(Path::new("report_protected.pdf"), &opts, &NoProgress).unwrap();
@@ -251,32 +251,22 @@ pub fn unlock(
     }
     p.report(10, 100);
 
-    let raw_bytes = fs::read(src)?;
-
     // Check if the document is actually encrypted before attempting password unlock
-    if let Ok(probe_doc) = Document::load_mem(&raw_bytes)
-        && !probe_doc.is_encrypted()
-        && probe_doc.trailer.get(b"Encrypt").is_err()
-        && !raw_bytes.windows(8).any(|w| w == b"/Encrypt")
+    if let Ok(unenc) = load_pdf(src, &LoadOptions::none())
+        && !unenc.was_encrypted
     {
         return Err(SheafError::InvalidSelection(
             "Document is not password-protected".to_string(),
         ));
     }
 
-    let mut doc = Document::load_mem_with_options(
-        &raw_bytes,
-        LoadOptions::with_password(opts.password.expose_secret()),
-    )
-    .map_err(|e| match e {
-        lopdf::Error::Decryption(_) | lopdf::Error::InvalidPassword => SheafError::WrongPassword,
-        other => SheafError::from_lopdf_with_path(other, src),
-    })?;
-
-    if doc.is_encrypted() {
-        doc.decrypt(opts.password.expose_secret())
-            .map_err(|_| SheafError::WrongPassword)?;
-    }
+    let loaded = load_pdf(
+        src,
+        &LoadOptions {
+            password: Some(opts.password.clone()),
+        },
+    )?;
+    let mut doc = loaded.doc;
 
     doc.trailer.remove(b"Encrypt");
     doc.encryption_state = None;

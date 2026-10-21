@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
-use sheaf_core::{PageSelection, SheafError, SplitMode, SplitOptions, SplitReport, info, split};
+use sheaf_core::{PageSelection, SheafError, SplitMode, SplitOptions, SplitReport, split};
 
 use crate::cli::SplitArgs;
 use crate::commands::{Command, Ctx, Outcome};
@@ -19,13 +19,22 @@ impl Command for SplitArgs {
                 "'--combine' can only be used together with '--ranges'.".to_string(),
             ));
         }
+
+        let mut resolver = crate::password::PasswordResolver::new();
+        let pw = resolver.resolve_open_password(&self.password_opts)?;
+        let load_opts = sheaf_core::LoadOptions { password: pw };
+
         let mode = if let Some(ref ranges_str) = self.ranges {
-            let info_report = info(std::slice::from_ref(&self.input), &sheaf_core::NoProgress)?;
+            let info_report = sheaf_core::ops::info::info_with_options(
+                std::slice::from_ref(&self.input),
+                &load_opts,
+                &sheaf_core::NoProgress,
+            )?;
             let file_info = info_report
                 .files
                 .first()
                 .ok_or(SheafError::EmptySelection)?;
-            if file_info.encrypted {
+            if file_info.encrypted && file_info.pages.is_none() {
                 return Err(SheafError::Encrypted);
             }
             let total_pages = file_info.pages.unwrap_or(0);
@@ -47,6 +56,7 @@ impl Command for SplitArgs {
 
         let out_dir = self.out.clone().unwrap_or_default();
         let opts = SplitOptions {
+            load: load_opts,
             mode,
             out_dir,
             force: ctx.global.force,
@@ -54,7 +64,8 @@ impl Command for SplitArgs {
         };
 
         let mut report = split(&self.input, &opts, &ctx.progress)?;
-        let warnings = std::mem::take(&mut report.warnings);
+        let mut warnings = std::mem::take(&mut report.warnings);
+        warnings.extend(resolver.warnings);
 
         Ok(Outcome {
             report,
