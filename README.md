@@ -11,6 +11,8 @@ No cloud uploads, no accounts, no telemetry. Original files are never modified.
 crates/
 ├─ sheaf-core   # Pure PDF manipulation & rendering library (lopdf, pdfium-render), zero UI dependencies
 └─ sheaf-cli    # Agent- and script-friendly CLI (`sheaf`) with JSON envelope & atomic writes
+apps/
+└─ desktop      # Native macOS desktop app (Tauri 2 + Svelte 5 + TypeScript + Vite)
 tests/
 └─ fixtures     # Curated and programmatically generated PDF test fixtures
 ```
@@ -44,12 +46,26 @@ tests/
 git clone https://github.com/0x70776c/Sheaf.git
 cd Sheaf
 
-# Build release binary
+# Build CLI release binary
 cargo build --release -p sheaf-cli
 
 # Inspect CLI capabilities
 ./target/release/sheaf capabilities --json
+
+# Typecheck & build the Svelte 5 desktop frontend
+cd apps/desktop
+npm install
+npm run check
+npm run build
 ```
+
+### Desktop UI Shell (`apps/desktop`)
+- **Minimalist macOS Design:** Transparent overlay titlebar, 220 px vibrancy sidebar with Lucide icons (`stroke-width: 1.5`), warm light (`#FAFAF9`) and native dark (`#161617`) color tokens, and 4 px grid spacing.
+- **Keyboard-First Workflow:**
+  - `⌘K`: Open Command Palette to switch tools, open files, or toggle theme (`System` / `Light` / `Dark`)
+  - `⌘O`: Open PDF file dialog
+  - `⌘1`–`⌘8`: Jump directly to *Merge*, *Split*, *Pages*, *Compress*, *Convert*, *Watermark*, *Protect*, or *Info*
+  - `↑` / `↓` / `Enter` / `Esc`: Full keyboard navigation across the sidebar, drop-zone, and command palette.
 
 ---
 

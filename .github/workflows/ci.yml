@@ -25,6 +25,12 @@ jobs:
         run: |
           mkdir -p vendor/pdfium
           curl -sL "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz" | tar -xzf - -C vendor/pdfium
+      - name: Setup Node & Build Desktop Frontend
+        working-directory: apps/desktop
+        run: |
+          npm ci
+          npm run check
+          npm run build
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run Clippy

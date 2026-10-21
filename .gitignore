@@ -1,4 +1,7 @@
 /target
 /vendor/pdfium
+apps/desktop/node_modules
+apps/desktop/dist
+apps/desktop/src-tauri/gen
 **/*.rs.bk
 .DS_Store

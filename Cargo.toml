@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/sheaf-core",
     "crates/sheaf-cli",
+    "apps/desktop/src-tauri",
 ]
 
 [workspace.package]
