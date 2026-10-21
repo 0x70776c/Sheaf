@@ -18,6 +18,12 @@ pub use ops::capabilities::{CapabilitiesReport, capabilities};
 pub use ops::compress::{
     CompressOptions, CompressPreset, CompressReport, compress, compress_with_options,
 };
+pub use ops::convert::{
+    ConvertPageSize, ConvertReport, ConvertedImagePage, ImageFormat, ImagesToPdfOptions,
+    ImagesToPdfReport, MarkdownToPdfOptions, MarkdownToPdfReport, PdfToImagesOptions,
+    PdfToImagesReport, PdfToMarkdownOptions, PdfToMarkdownReport, images_to_pdf, markdown_to_pdf,
+    pdf_to_images, pdf_to_markdown,
+};
 pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
 pub use ops::pages::{

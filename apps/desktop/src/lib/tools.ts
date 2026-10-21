@@ -52,9 +52,9 @@ export const TOOLS: ToolMetadata[] = [
     label: 'Convert',
     group: 'primary',
     shortcut: '⌘5',
-    actionLabel: 'Export Images',
-    emptyPrompt: 'Drop a PDF or image files here to convert',
-    description: 'Render PDF pages to PNG/JPG at custom DPI or assemble images into a PDF.',
+    actionLabel: 'Convert Document',
+    emptyPrompt: 'Drop a PDF, PNG/JPG images, or a Markdown (.md) file here to convert',
+    description: 'Convert between PDF, PNG/JPG images, and Markdown (.md) documents.',
   },
   {
     id: 'watermark',

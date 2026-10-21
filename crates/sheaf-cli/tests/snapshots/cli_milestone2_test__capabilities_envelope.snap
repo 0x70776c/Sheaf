@@ -63,6 +63,21 @@ expression: cap_val
       },
       {
         "args": [
+          "to-images|from-images|to-markdown|from-markdown",
+          "input",
+          "--format",
+          "--dpi",
+          "--quality",
+          "--pages",
+          "--page-size",
+          "--margin",
+          "-o"
+        ],
+        "name": "convert",
+        "status": "stable"
+      },
+      {
+        "args": [
           "file..."
         ],
         "name": "info",

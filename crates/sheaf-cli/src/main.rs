@@ -91,6 +91,7 @@ fn main() -> ExitCode {
         Commands::Pages(args) => execute_command(args, &cli.global, cancelled),
         Commands::Render(args) => execute_command(args, &cli.global, cancelled),
         Commands::Compress(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Convert(args) => execute_command(args, &cli.global, cancelled),
         Commands::Info(args) => execute_command(args, &cli.global, cancelled),
         Commands::Verify(args) => execute_command(args, &cli.global, cancelled),
         Commands::Capabilities(args) => execute_command(args, &cli.global, cancelled),

@@ -67,6 +67,12 @@ export interface PagesReport {
   degrees?: number | null;
 }
 
+export type ConvertActionUi = 'to-images' | 'from-images' | 'to-markdown' | 'from-markdown';
+
+export type ImageFormatUi = 'png' | 'jpg';
+
+export type ConvertPageSizeUi = 'fit' | 'a4' | 'letter';
+
 export interface CompressReport {
   input: string;
   output: string;
@@ -81,6 +87,62 @@ export interface CompressReport {
   already_optimal: boolean;
   dry_run: boolean;
 }
+
+export interface ConvertedImagePage {
+  page: number;
+  path: string;
+  width_px: number;
+  height_px: number;
+}
+
+export interface PdfToImagesReport {
+  action: 'to-images';
+  input: string;
+  output_dir: string;
+  format: string;
+  dpi: number;
+  total_pages: number;
+  outputs: ConvertedImagePage[];
+  dry_run: boolean;
+}
+
+export interface ImagesToPdfReport {
+  action: 'from-images';
+  inputs: string[];
+  output: string;
+  page_size: string;
+  margin_pt: number;
+  pages: number;
+  dry_run: boolean;
+}
+
+export interface PdfToMarkdownReport {
+  action: 'to-markdown';
+  input: string;
+  output: string;
+  total_pages: number;
+  extracted_pages: number;
+  char_count: number;
+  line_count: number;
+  dry_run: boolean;
+}
+
+export interface MarkdownToPdfReport {
+  action: 'from-markdown';
+  input: string;
+  output: string;
+  page_size: string;
+  margin_pt: number;
+  pages: number;
+  headings_count: number;
+  dry_run: boolean;
+}
+
+export type ConvertReport =
+  | PdfToImagesReport
+  | ImagesToPdfReport
+  | PdfToMarkdownReport
+  | MarkdownToPdfReport;
 
 export interface ThumbnailItem {
   page: number;

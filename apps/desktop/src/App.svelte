@@ -29,11 +29,15 @@
     onProgressEvent,
     openPathInSystem,
     openPdf,
+    pickImageFiles,
+    pickMarkdownFile,
     pickOutputDirectory,
     pickPdfFiles,
+    pickSaveMarkdownPath,
     pickSavePdfPath,
     revealInFinder,
     runCompressCommand,
+    runConvertCommand,
     runMergeCommand,
     runPagesCommand,
     runSplitCommand,
@@ -41,7 +45,10 @@
   import type {
     CommandErrorPayload,
     CompressPresetUi,
+    ConvertActionUi,
+    ConvertPageSizeUi,
     FileInfo,
+    ImageFormatUi,
     PagesActionUi,
     ProgressEventPayload,
     SplitModeUi,
@@ -83,6 +90,18 @@
   let compressGrayscale = $state(false);
   let compressOutPath = $state<string | null>(null);
 
+  // Convert options
+  let convertAction = $state<ConvertActionUi>('to-images');
+  let convertFormat = $state<ImageFormatUi>('png');
+  let convertDpi = $state<number>(150);
+  let convertQuality = $state<number>(85);
+  let convertPagesSpec = $state('');
+  let convertPageSize = $state<ConvertPageSizeUi>('a4');
+  let convertMarginPt = $state<number>(36);
+  let convertOutPath = $state<string | null>(null);
+  let convertImagePaths = $state<string[]>([]);
+  let convertMarkdownPath = $state<string | null>(null);
+
   // Execution & feedback state
   let isRunning = $state(false);
   let progress = $state<ProgressEventPayload | null>(null);
@@ -92,6 +111,11 @@
   let currentToolMeta = $derived(getToolById(activeTool));
   let primaryFile = $derived<FileInfo | undefined>(loadedFiles[0]);
   let primaryTotalPages = $derived(primaryFile?.pages ?? 0);
+  let hasWorkspaceInput = $derived(
+    loadedFiles.length > 0 ||
+      (activeTool === 'convert' &&
+        (convertImagePaths.length > 0 || convertMarkdownPath !== null)),
+  );
 
   $effect(() => {
     const root = document.documentElement;
@@ -129,11 +153,39 @@
   }
 
   async function loadPaths(paths: string[], append = false) {
+    const imgExts = ['.png', '.jpg', '.jpeg'];
+    const mdExts = ['.md', '.markdown'];
+
+    const imageFiles = paths.filter((p) =>
+      imgExts.some((ext) => p.toLowerCase().endsWith(ext)),
+    );
+    const mdFiles = paths.filter((p) =>
+      mdExts.some((ext) => p.toLowerCase().endsWith(ext)),
+    );
     const pdfPaths = paths.filter((p) => p.toLowerCase().endsWith('.pdf'));
+
+    if (imageFiles.length > 0 && pdfPaths.length === 0) {
+      activeTool = 'convert';
+      convertAction = 'from-images';
+      convertImagePaths = append
+        ? [...convertImagePaths, ...imageFiles]
+        : imageFiles;
+      errorBanner = null;
+      return;
+    }
+
+    if (mdFiles.length > 0 && pdfPaths.length === 0) {
+      activeTool = 'convert';
+      convertAction = 'from-markdown';
+      convertMarkdownPath = mdFiles[0];
+      errorBanner = null;
+      return;
+    }
+
     if (pdfPaths.length === 0) {
       errorBanner = {
         code: 'invalid_selection',
-        message: 'Please select at least one .pdf file.',
+        message: 'Please select a .pdf, .png, .jpg, or .md file.',
         hint: null,
       };
       return;
@@ -157,6 +209,7 @@
           const total = first.pages ?? 1;
           splitRangesInput = total > 1 ? `1-${Math.min(3, total)}` : '1';
           pagesSpecInput = '';
+          convertPagesSpec = '';
           await loadThumbnailsUpTo(first, 20);
         }
       }
@@ -166,6 +219,22 @@
   }
 
   async function handleChooseFiles(append = false) {
+    if (activeTool === 'convert' && convertAction === 'from-images') {
+      const imgs = await pickImageFiles(true);
+      if (imgs.length > 0) {
+        convertImagePaths = append
+          ? [...convertImagePaths, ...imgs]
+          : imgs;
+      }
+      return;
+    }
+    if (activeTool === 'convert' && convertAction === 'from-markdown') {
+      const md = await pickMarkdownFile();
+      if (md) {
+        convertMarkdownPath = md;
+      }
+      return;
+    }
     const allowMultiple = activeTool === 'merge';
     const selected = await pickPdfFiles(allowMultiple);
     if (selected.length > 0) {
@@ -175,6 +244,8 @@
 
   function handleClearFiles() {
     loadedFiles = [];
+    convertImagePaths = [];
+    convertMarkdownPath = null;
     thumbnailsMap = new Map();
     selectedPages = new Set();
     errorBanner = null;
@@ -187,14 +258,24 @@
       splitRangesInput = formatted;
     } else if (activeTool === 'pages' && pagesAction !== 'reorder') {
       pagesSpecInput = formatted;
+    } else if (
+      activeTool === 'convert' &&
+      (convertAction === 'to-images' || convertAction === 'to-markdown')
+    ) {
+      convertPagesSpec = formatted;
     }
   }
 
-  function handleRangesInputEdit(value: string, target: 'split' | 'pages') {
+  function handleRangesInputEdit(
+    value: string,
+    target: 'split' | 'pages' | 'convert',
+  ) {
     if (target === 'split') {
       splitRangesInput = value;
-    } else {
+    } else if (target === 'pages') {
       pagesSpecInput = value;
+    } else {
+      convertPagesSpec = value;
     }
     if (primaryTotalPages > 0) {
       selectedPages = parseRangesToPageSet(value, primaryTotalPages);
@@ -224,7 +305,7 @@
   }
 
   async function handleRunPrimaryAction() {
-    if (isRunning || loadedFiles.length === 0) return;
+    if (isRunning || !hasWorkspaceInput) return;
     errorBanner = null;
     toastNotice = null;
     isRunning = true;
@@ -291,6 +372,66 @@
               subtitle: basename(rep.output),
               targetPath: rep.output,
             };
+      } else if (activeTool === 'convert') {
+        const inputs =
+          convertAction === 'from-images'
+            ? convertImagePaths
+            : convertAction === 'from-markdown'
+              ? convertMarkdownPath
+                ? [convertMarkdownPath]
+                : []
+              : primaryFile
+                ? [primaryFile.path]
+                : [];
+
+        const rep = await runConvertCommand({
+          action: convertAction,
+          inputs,
+          format: convertAction === 'to-images' ? convertFormat : null,
+          dpi: convertAction === 'to-images' ? convertDpi : null,
+          quality: convertAction === 'to-images' ? convertQuality : null,
+          pages:
+            convertAction === 'to-images' || convertAction === 'to-markdown'
+              ? convertPagesSpec.trim() || null
+              : null,
+          pageSize:
+            convertAction === 'from-images' || convertAction === 'from-markdown'
+              ? convertPageSize
+              : null,
+          marginPt:
+            convertAction === 'from-images' || convertAction === 'from-markdown'
+              ? convertMarginPt
+              : null,
+          out: convertOutPath,
+          force: true,
+        });
+
+        if (rep.action === 'to-images') {
+          const target = rep.outputs[0]?.path ?? rep.output_dir;
+          toastNotice = {
+            title: `Exported ${rep.outputs.length} ${rep.format.toUpperCase()} ${rep.outputs.length === 1 ? 'image' : 'images'}`,
+            subtitle: basename(rep.output_dir),
+            targetPath: target,
+          };
+        } else if (rep.action === 'from-images') {
+          toastNotice = {
+            title: `Created ${rep.pages}-page PDF from images`,
+            subtitle: basename(rep.output),
+            targetPath: rep.output,
+          };
+        } else if (rep.action === 'to-markdown') {
+          toastNotice = {
+            title: `Extracted Markdown (${rep.line_count} lines)`,
+            subtitle: basename(rep.output),
+            targetPath: rep.output,
+          };
+        } else {
+          toastNotice = {
+            title: `Rendered ${rep.pages}-page PDF from Markdown`,
+            subtitle: basename(rep.output),
+            targetPath: rep.output,
+          };
+        }
       }
     } catch (err) {
       errorBanner = extractErrorMessage(err);
@@ -418,12 +559,12 @@
         </div>
 
         <div class="titlebar-actions">
-          {#if loadedFiles.length > 0}
+          {#if hasWorkspaceInput}
             <button
               type="button"
               class="ghost-btn"
               onclick={() => void handleChooseFiles(false)}
-              aria-label="Open PDF file (Command+O)"
+              aria-label="Open file (Command+O)"
             >
               <FolderOpen size={14} strokeWidth={1.5} aria-hidden="true" />
               <span>Open…</span>
@@ -463,7 +604,7 @@
         </div>
       {/if}
 
-      {#if loadedFiles.length === 0}
+      {#if !hasWorkspaceInput}
         <DropZone
           tool={currentToolMeta}
           {isDraggingOver}
@@ -497,6 +638,43 @@
                 }
               }}
             />
+          {:else}
+            <div class="convert-source-pane">
+              {#if convertAction === 'from-images'}
+                <div class="source-card">
+                  <h3 class="source-card-title">
+                    Images to Combine ({convertImagePaths.length})
+                  </h3>
+                  <ul class="source-path-list">
+                    {#each convertImagePaths as imgPath, idx (imgPath + idx)}
+                      <li class="source-path-item">
+                        <span class="source-index">{idx + 1}.</span>
+                        <span class="source-name">{basename(imgPath)}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                  <button
+                    type="button"
+                    class="small-btn"
+                    onclick={() => void handleChooseFiles(true)}
+                  >
+                    Add Images…
+                  </button>
+                </div>
+              {:else if convertAction === 'from-markdown' && convertMarkdownPath}
+                <div class="source-card">
+                  <h3 class="source-card-title">Markdown Source</h3>
+                  <p class="source-name">{basename(convertMarkdownPath)}</p>
+                  <button
+                    type="button"
+                    class="small-btn"
+                    onclick={() => void handleChooseFiles(false)}
+                  >
+                    Change File…
+                  </button>
+                </div>
+              {/if}
+            </div>
           {/if}
 
           <aside
@@ -839,6 +1017,216 @@
                   <span class="field-label">Original Size</span>
                   <div class="summary-pill">{formatBytes(primaryFile.size_bytes)}</div>
                 </div>
+              {:else if activeTool === 'convert'}
+                <div class="option-group">
+                  <label class="field-label" for="convert-mode-select">
+                    Conversion Mode
+                  </label>
+                  <select
+                    id="convert-mode-select"
+                    class="text-input"
+                    value={convertAction}
+                    onchange={(e) => {
+                      convertAction = e.currentTarget.value as ConvertActionUi;
+                      convertOutPath = null;
+                    }}
+                  >
+                    <option value="to-images">PDF → Images (PNG / JPG)</option>
+                    <option value="from-images">Images → PDF</option>
+                    <option value="to-markdown">PDF → Markdown (.md)</option>
+                    <option value="from-markdown">Markdown (.md) → PDF</option>
+                  </select>
+                </div>
+
+                {#if convertAction === 'to-images'}
+                  <div class="option-group">
+                    <span class="field-label">Image Format</span>
+                    <div class="segmented-control">
+                      <button
+                        type="button"
+                        class="seg-btn"
+                        class:active={convertFormat === 'png'}
+                        onclick={() => {
+                          convertFormat = 'png';
+                        }}
+                      >
+                        PNG
+                      </button>
+                      <button
+                        type="button"
+                        class="seg-btn"
+                        class:active={convertFormat === 'jpg'}
+                        onclick={() => {
+                          convertFormat = 'jpg';
+                        }}
+                      >
+                        JPG
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Resolution (DPI)</span>
+                    <div class="segmented-control">
+                      {#each [72, 150, 300] as dpiVal (dpiVal)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={convertDpi === dpiVal}
+                          onclick={() => {
+                            convertDpi = dpiVal;
+                          }}
+                        >
+                          {dpiVal} DPI
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+
+                  {#if convertFormat === 'jpg'}
+                    <div class="option-group">
+                      <label class="field-label" for="convert-jpg-quality">
+                        JPEG Quality ({convertQuality}%)
+                      </label>
+                      <input
+                        id="convert-jpg-quality"
+                        type="range"
+                        min="40"
+                        max="100"
+                        step="5"
+                        value={convertQuality}
+                        oninput={(e) => {
+                          convertQuality = Number(e.currentTarget.value) || 85;
+                        }}
+                      />
+                    </div>
+                  {/if}
+
+                  <div class="option-group">
+                    <label class="field-label" for="convert-pages-input">
+                      Pages (empty = all pages)
+                    </label>
+                    <input
+                      id="convert-pages-input"
+                      type="text"
+                      class="text-input"
+                      value={convertPagesSpec}
+                      oninput={(e) =>
+                        handleRangesInputEdit(e.currentTarget.value, 'convert')}
+                      placeholder="All pages"
+                    />
+                  </div>
+                {:else if convertAction === 'from-images'}
+                  <div class="option-group">
+                    <span class="field-label">Page Size</span>
+                    <div class="segmented-control">
+                      {#each ['fit', 'a4', 'letter'] as ps (ps)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={convertPageSize === ps}
+                          onclick={() => {
+                            convertPageSize = ps as ConvertPageSizeUi;
+                          }}
+                        >
+                          {ps.toUpperCase()}
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Margin</span>
+                    <div class="segmented-control">
+                      {#each [0, 18, 36] as m (m)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={convertMarginPt === m}
+                          onclick={() => {
+                            convertMarginPt = m;
+                          }}
+                        >
+                          {m} pt
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+                {:else if convertAction === 'to-markdown'}
+                  <div class="option-group">
+                    <label class="field-label" for="convert-md-pages-input">
+                      Pages (empty = all pages)
+                    </label>
+                    <input
+                      id="convert-md-pages-input"
+                      type="text"
+                      class="text-input"
+                      value={convertPagesSpec}
+                      oninput={(e) =>
+                        handleRangesInputEdit(e.currentTarget.value, 'convert')}
+                      placeholder="All pages"
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Output Markdown File</span>
+                    <div class="path-picker-row">
+                      <span class="path-preview">
+                        {convertOutPath
+                          ? basename(convertOutPath)
+                          : primaryFile
+                            ? `${basename(primaryFile.path).replace(/\.pdf$/i, '')}.md`
+                            : 'output.md'}
+                      </span>
+                      <button
+                        type="button"
+                        class="small-btn"
+                        onclick={async () => {
+                          const chosen = await pickSaveMarkdownPath('document.md');
+                          if (chosen) convertOutPath = chosen;
+                        }}
+                      >
+                        Save As…
+                      </button>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="option-group">
+                    <span class="field-label">Page Size</span>
+                    <div class="segmented-control">
+                      {#each ['a4', 'letter'] as ps (ps)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={convertPageSize === ps}
+                          onclick={() => {
+                            convertPageSize = ps as ConvertPageSizeUi;
+                          }}
+                        >
+                          {ps.toUpperCase()}
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Margin</span>
+                    <div class="segmented-control">
+                      {#each [36, 54, 72] as m (m)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={convertMarginPt === m}
+                          onclick={() => {
+                            convertMarginPt = m;
+                          }}
+                        >
+                          {m} pt
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
               {:else if activeTool === 'info' && primaryFile}
                 <div class="info-list">
                   <div class="info-item">
@@ -887,7 +1275,7 @@
             </div>
 
             <div class="options-footer">
-              {#if activeTool === 'merge' || activeTool === 'split' || activeTool === 'pages' || activeTool === 'compress'}
+              {#if activeTool === 'merge' || activeTool === 'split' || activeTool === 'pages' || activeTool === 'compress' || activeTool === 'convert'}
                 <button
                   type="button"
                   class="primary-action-btn"
@@ -904,6 +1292,14 @@
                         : pagesAction === 'reorder'
                           ? 'Reorder Pages'
                           : 'Extract Pages'}
+                  {:else if activeTool === 'convert'}
+                    {convertAction === 'to-images'
+                      ? `Export ${convertFormat.toUpperCase()} Images`
+                      : convertAction === 'from-images'
+                        ? 'Create PDF from Images'
+                        : convertAction === 'to-markdown'
+                          ? 'Export Markdown (.md)'
+                          : 'Render PDF from Markdown'}
                   {:else}
                     {currentToolMeta.actionLabel}
                   {/if}
@@ -1288,5 +1684,64 @@
   .primary-action-btn:disabled {
     opacity: 0.55;
     cursor: default;
+  }
+
+  .convert-source-pane {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+  }
+
+  .source-card {
+    width: 100%;
+    max-width: 420px;
+    padding: var(--space-5);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .source-card-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .source-path-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  .source-path-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    font-size: 12px;
+  }
+
+  .source-index {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .source-name {
+    margin: 0;
+    font-size: 12px;
+    word-break: break-all;
   }
 </style>

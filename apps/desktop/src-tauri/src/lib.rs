@@ -13,10 +13,12 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::Serialize;
 use sheaf_core::{
-    CapabilitiesReport, CompressOptions, CompressPreset, CompressReport,
-    DEFAULT_THUMBNAIL_WIDTH_PX, InfoReport, MergeOptions, MergeReport, NoProgress, PageOpOptions,
-    PageSelection, PagesReport, Progress, SheafError, SplitMode, SplitOptions, SplitReport,
-    capabilities, compress_with_options, delete_pages, extract_pages, info, merge_with_options,
+    CapabilitiesReport, CompressOptions, CompressPreset, CompressReport, ConvertPageSize,
+    ConvertReport, DEFAULT_THUMBNAIL_WIDTH_PX, ImageFormat, ImagesToPdfOptions, InfoReport,
+    MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, PageOpOptions, PageSelection,
+    PagesReport, PdfToImagesOptions, PdfToMarkdownOptions, Progress, SheafError, SplitMode,
+    SplitOptions, SplitReport, capabilities, compress_with_options, delete_pages, extract_pages,
+    images_to_pdf, info, markdown_to_pdf, merge_with_options, pdf_to_images, pdf_to_markdown,
     render_thumbnails, reorder_pages, rotate_pages, split,
 };
 use tauri::{AppHandle, Emitter, State};
@@ -281,6 +283,102 @@ pub fn execute_compress_op(
     compress_with_options(input, &opts, progress)
 }
 
+/// Core execution helper for `run_convert` (testable without a Tauri `AppHandle`).
+#[allow(clippy::too_many_arguments)]
+pub fn execute_convert_op(
+    action: &str,
+    inputs: &[PathBuf],
+    format: Option<&str>,
+    dpi: Option<u32>,
+    quality: Option<u8>,
+    pages: Option<&str>,
+    page_size: Option<&str>,
+    margin_pt: Option<f32>,
+    out: Option<&Path>,
+    force: bool,
+    progress: &dyn Progress,
+) -> Result<ConvertReport, SheafError> {
+    let clean_out = out
+        .filter(|p| !p.as_os_str().is_empty())
+        .map(Path::to_path_buf);
+    let clean_pages = pages
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+
+    match action {
+        "to-images" => {
+            let src = inputs.first().ok_or(SheafError::EmptySelection)?;
+            let fmt = ImageFormat::parse(format.unwrap_or("png"))?;
+            let opts = PdfToImagesOptions {
+                format: fmt,
+                dpi: dpi.unwrap_or(150),
+                quality: quality.unwrap_or(85),
+                pages: clean_pages,
+                out_dir: clean_out,
+                force,
+                dry_run: false,
+            };
+            Ok(ConvertReport::ToImages(pdf_to_images(
+                src, &opts, progress,
+            )?))
+        }
+        "from-images" => {
+            if inputs.is_empty() {
+                return Err(SheafError::EmptySelection);
+            }
+            let target_out = match clean_out {
+                Some(p) => p,
+                None => {
+                    let first = &inputs[0];
+                    let parent = first.parent().unwrap_or_else(|| Path::new("."));
+                    parent.join("images_combined.pdf")
+                }
+            };
+            let ps = ConvertPageSize::parse(page_size.unwrap_or("fit"))?;
+            let opts = ImagesToPdfOptions {
+                page_size: ps,
+                margin_pt: margin_pt.unwrap_or(0.0),
+                out: target_out,
+                force,
+                dry_run: false,
+            };
+            Ok(ConvertReport::FromImages(images_to_pdf(
+                inputs, &opts, progress,
+            )?))
+        }
+        "to-markdown" => {
+            let src = inputs.first().ok_or(SheafError::EmptySelection)?;
+            let opts = PdfToMarkdownOptions {
+                pages: clean_pages,
+                out: clean_out,
+                force,
+                dry_run: false,
+            };
+            Ok(ConvertReport::ToMarkdown(pdf_to_markdown(
+                src, &opts, progress,
+            )?))
+        }
+        "from-markdown" => {
+            let src = inputs.first().ok_or(SheafError::EmptySelection)?;
+            let ps = ConvertPageSize::parse(page_size.unwrap_or("a4"))?;
+            let opts = MarkdownToPdfOptions {
+                page_size: ps,
+                margin_pt: margin_pt.unwrap_or(54.0),
+                out: clean_out,
+                force,
+                dry_run: false,
+            };
+            Ok(ConvertReport::FromMarkdown(markdown_to_pdf(
+                src, &opts, progress,
+            )?))
+        }
+        other => Err(SheafError::InvalidSelection(format!(
+            "Unsupported convert action '{other}'"
+        ))),
+    }
+}
+
 /// Inspects one or more local PDF files and returns their [`InfoReport`].
 #[tauri::command]
 async fn open_pdf(paths: Vec<String>) -> Result<InfoReport, CommandError> {
@@ -505,6 +603,58 @@ async fn run_compress(
     res.map_err(CommandError::from)
 }
 
+/// Runs format conversion (`to-images`, `from-images`, `to-markdown`, `from-markdown`) on a worker thread.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn run_convert(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    action: String,
+    inputs: Vec<String>,
+    format: Option<String>,
+    dpi: Option<u32>,
+    quality: Option<u8>,
+    pages: Option<String>,
+    page_size: Option<String>,
+    margin_pt: Option<f32>,
+    out: Option<String>,
+    force: bool,
+) -> Result<ConvertReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_paths: Vec<PathBuf> = inputs.into_iter().map(PathBuf::from).collect();
+    let out_path = out.map(PathBuf::from);
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "convert",
+            cancelled,
+        };
+        execute_convert_op(
+            &action,
+            &input_paths,
+            format.as_deref(),
+            dpi,
+            quality,
+            pages.as_deref(),
+            page_size.as_deref(),
+            margin_pt,
+            out_path.as_deref(),
+            force,
+            &progress,
+        )
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
 /// Reveals a generated file or directory in macOS Finder (`open -R`).
 #[tauri::command]
 fn reveal_in_finder(path: String) -> Result<(), CommandError> {
@@ -580,6 +730,7 @@ pub fn run() {
             run_split,
             run_pages,
             run_compress,
+            run_convert,
             reveal_in_finder,
             open_path,
             cancel_op,

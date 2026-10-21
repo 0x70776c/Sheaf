@@ -64,7 +64,7 @@ npm run build
 - **Interactive Thumbnail Grid & Progressive Disclosure:**
   - Lazy-loaded PDFium page thumbnails with skeleton placeholders and bi-directional page range synchronization.
   - Multi-page selection via single click, `⇧+Click` (range), `⌘+Click` (toggle), and `⌘A` (select/deselect all).
-  - Dedicated right-hand options panels for **Merge** (queue reordering, add/remove files), **Split** (*Ranges* with *Combine* toggle, *Every N*, *Bookmarks*), **Pages** (*Rotate* 90°/180°/270°, *Delete*, *Reorder*, *Extract*), **Compress** (*Low* / *Medium* / *High* presets + *Grayscale* toggle with before/after size comparison), and **Info**.
+  - Dedicated right-hand options panels for **Merge** (queue reordering, add/remove files), **Split** (*Ranges* with *Combine* toggle, *Every N*, *Bookmarks*), **Pages** (*Rotate* 90°/180°/270°, *Delete*, *Reorder*, *Extract*), **Compress** (*Low* / *Medium* / *High* presets + *Grayscale* toggle with before/after size comparison), **Convert** (*PDF → Images*, *Images → PDF*, *PDF → Markdown*, and *Markdown → PDF*), and **Info**.
   - Real-time progress bar with cancellation (`Cancel`) and completion toast with **Show in Finder** (`open -R`) and **Open** actions.
 - **Keyboard-First Workflow:**
   - `⌘K`: Open Command Palette to switch tools, open files, or toggle theme (`System` / `Light` / `Dark`)
@@ -176,7 +176,30 @@ sheaf compress photo_report.pdf --preset high --grayscale -o compact.pdf --json
 
 ---
 
-### 6. `sheaf info`
+### 6. `sheaf convert`
+Convert between PDF, images (`PNG`/`JPG`), and Markdown (`.md`) documents:
+- `to-images`: Export all or selected PDF pages as `PNG` or `JPG` at custom `--dpi` (`18..=1200`) and JPEG `--quality` (`1..=100`).
+- `from-images`: Combine `PNG`/`JPG` images into a multi-page PDF (`--page-size fit|a4|letter` and `--margin` in PDF points).
+- `to-markdown`: Extract structured Markdown (`.md`) from a PDF (reconstructing headings from bookmarks and font sizes, bullet lists, code blocks, and paragraphs).
+- `from-markdown`: Render a Markdown (`.md`) document into a paginated vector PDF (`--page-size a4|letter`, `--margin`) with selectable text and automatic PDF bookmarks/outlines for headings.
+
+```bash
+# Export PDF pages as 150 DPI PNG images
+sheaf convert to-images report.pdf --format png --dpi 150 -o images/
+
+# Combine PNG/JPG images into an A4 PDF with 36 pt margins
+sheaf convert from-images page1.png page2.jpg --page-size a4 --margin 36 -o scan.pdf
+
+# Extract structured Markdown (.md) from a PDF
+sheaf convert to-markdown report.pdf -o report.md
+
+# Render a Markdown (.md) file into a multi-page vector PDF with outlines
+sheaf convert from-markdown README.md --page-size a4 --margin 54 -o README.pdf --json
+```
+
+---
+
+### 7. `sheaf info`
 Inspect structural properties and metadata (`size_bytes`, `pdf_version`, `pages`, `encrypted`, `metadata`, `has_outlines`, `outline_count`, `first_page_size_pt`). Encrypted PDFs return exit code `0` with `"encrypted": true` and `"pages": null`.
 
 ```bash
@@ -186,7 +209,7 @@ sheaf info a.pdf b.pdf --json
 
 ---
 
-### 7. `sheaf verify`
+### 8. `sheaf verify`
 Verify PDF files for structural integrity (loads cleanly, valid catalog & page tree, resolvable page content streams and resources). With `--deep`, also runs `qpdf --check` when available.
 
 ```bash
@@ -196,7 +219,7 @@ sheaf verify out/*.pdf --deep --json
 
 ---
 
-### 8. `sheaf capabilities`
+### 9. `sheaf capabilities`
 Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`).
 
 ```bash

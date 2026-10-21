@@ -101,6 +101,21 @@ pub fn capabilities() -> CapabilitiesReport {
             status: "stable",
         },
         CommandCapability {
+            name: "convert",
+            args: vec![
+                "to-images|from-images|to-markdown|from-markdown",
+                "input",
+                "--format",
+                "--dpi",
+                "--quality",
+                "--pages",
+                "--page-size",
+                "--margin",
+                "-o",
+            ],
+            status: "stable",
+        },
+        CommandCapability {
             name: "info",
             args: vec!["file..."],
             status: "stable",

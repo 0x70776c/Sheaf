@@ -92,6 +92,12 @@ pub enum Commands {
     )]
     Compress(CompressArgs),
 
+    /// Convert between PDF, images (PNG/JPG), and Markdown (.md)
+    #[command(
+        after_help = "Examples:\n  sheaf convert to-images report.pdf --format png --dpi 150 -o images/\n  sheaf convert from-images page1.png page2.jpg --page-size a4 -o combined.pdf\n  sheaf convert to-markdown report.pdf -o report.md\n  sheaf convert from-markdown notes.md --page-size a4 -o notes.pdf --json"
+    )]
+    Convert(ConvertArgs),
+
     /// Inspect structural properties and metadata of PDF files
     #[command(after_help = "Examples:\n  sheaf info document.pdf\n  sheaf info a.pdf b.pdf --json")]
     Info(InfoArgs),
@@ -286,6 +292,116 @@ pub struct CompressArgs {
     pub grayscale: bool,
 
     /// Target output PDF file (defaults to {stem}_compressed.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct ConvertArgs {
+    #[command(subcommand)]
+    pub action: ConvertSubcommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum ConvertSubcommand {
+    /// Export PDF pages as PNG or JPG images
+    #[command(
+        after_help = "Examples:\n  sheaf convert to-images report.pdf --format png --dpi 150 -o images/\n  sheaf convert to-images report.pdf --format jpg --dpi 300 --quality 90 --pages \"1-5\" -o jpg_out/ --json"
+    )]
+    ToImages(ConvertToImagesArgs),
+
+    /// Combine PNG/JPG images into a multi-page PDF
+    #[command(
+        after_help = "Examples:\n  sheaf convert from-images scan1.png scan2.png -o scans.pdf\n  sheaf convert from-images photo1.jpg photo2.jpg --page-size a4 --margin 36 -o album.pdf --json"
+    )]
+    FromImages(ConvertFromImagesArgs),
+
+    /// Extract structured Markdown (.md) from a PDF document
+    #[command(
+        after_help = "Examples:\n  sheaf convert to-markdown report.pdf -o report.md\n  sheaf convert to-markdown book.pdf --pages \"1-10\" -o chapter1.md --json"
+    )]
+    ToMarkdown(ConvertToMarkdownArgs),
+
+    /// Render a Markdown (.md) document into a multi-page vector PDF
+    #[command(
+        after_help = "Examples:\n  sheaf convert from-markdown README.md -o README.pdf\n  sheaf convert from-markdown notes.md --page-size letter --margin 54 -o notes.pdf --json"
+    )]
+    FromMarkdown(ConvertFromMarkdownArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct ConvertToImagesArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Output image format: png or jpg
+    #[arg(long, default_value = "png")]
+    pub format: String,
+
+    /// Target resolution in dots per inch (18..=1200)
+    #[arg(long, default_value_t = 150)]
+    pub dpi: u32,
+
+    /// JPEG quality (1..=100; used when --format is jpg)
+    #[arg(long, default_value_t = 85)]
+    pub quality: u8,
+
+    /// Optional 1-based page ranges to export (omit to export all pages)
+    #[arg(long)]
+    pub pages: Option<String>,
+
+    /// Output directory (defaults to {stem}_images/)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct ConvertFromImagesArgs {
+    /// Input image files (PNG, JPG/JPEG) in page order
+    #[arg(required = true)]
+    pub inputs: Vec<PathBuf>,
+
+    /// Target page size: fit (match image dimensions), a4, or letter
+    #[arg(long, default_value = "fit")]
+    pub page_size: String,
+
+    /// Page margin in PDF points (0..=200)
+    #[arg(long, default_value_t = 0.0)]
+    pub margin: f32,
+
+    /// Target output PDF file
+    #[arg(short, long)]
+    pub out: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct ConvertToMarkdownArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Optional 1-based page ranges to extract (omit to extract all pages)
+    #[arg(long)]
+    pub pages: Option<String>,
+
+    /// Target output Markdown file (defaults to {stem}.md)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct ConvertFromMarkdownArgs {
+    /// Input Markdown (.md) file
+    pub input: PathBuf,
+
+    /// Target page size: a4 or letter
+    #[arg(long, default_value = "a4")]
+    pub page_size: String,
+
+    /// Page margin in PDF points (18..=144)
+    #[arg(long, default_value_t = 54.0)]
+    pub margin: f32,
+
+    /// Target output PDF file (defaults to {stem}.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
 }

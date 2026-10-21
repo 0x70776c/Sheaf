@@ -94,7 +94,7 @@ pub fn is_pdfium_available() -> bool {
     get_pdfium().is_ok()
 }
 
-fn get_pdfium() -> Result<&'static Pdfium, SheafError> {
+pub(crate) fn get_pdfium() -> Result<&'static Pdfium, SheafError> {
     let res = PDFIUM_INSTANCE.get_or_init(init_pdfium_bindings);
     match res {
         Ok(pdfium) => Ok(pdfium),

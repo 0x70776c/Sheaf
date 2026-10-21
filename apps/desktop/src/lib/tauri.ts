@@ -5,6 +5,10 @@ import type {
   CommandErrorPayload,
   CompressPresetUi,
   CompressReport,
+  ConvertActionUi,
+  ConvertPageSizeUi,
+  ConvertReport,
+  ImageFormatUi,
   InfoReport,
   MergeReport,
   PagesActionUi,
@@ -31,6 +35,26 @@ export async function pickPdfFiles(multiple = true): Promise<string[]> {
   return Array.isArray(selected) ? selected : [selected];
 }
 
+export async function pickImageFiles(multiple = true): Promise<string[]> {
+  if (!isTauriRuntime()) return [];
+  const selected = await open({
+    multiple,
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg'] }],
+  });
+  if (!selected) return [];
+  return Array.isArray(selected) ? selected : [selected];
+}
+
+export async function pickMarkdownFile(): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: 'Markdown Document', extensions: ['md', 'markdown', 'txt'] }],
+  });
+  if (!selected || Array.isArray(selected)) return null;
+  return selected;
+}
+
 export async function pickOutputDirectory(): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   const selected = await open({
@@ -46,6 +70,14 @@ export async function pickSavePdfPath(defaultName: string): Promise<string | nul
   return await save({
     defaultPath: defaultName,
     filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
+  });
+}
+
+export async function pickSaveMarkdownPath(defaultName: string): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  return await save({
+    defaultPath: defaultName,
+    filters: [{ name: 'Markdown Document', extensions: ['md'] }],
   });
 }
 
@@ -134,6 +166,34 @@ export async function runCompressCommand(params: RunCompressParams): Promise<Com
     input: params.input,
     preset: params.preset,
     grayscale: params.grayscale ?? false,
+    out: params.out ?? null,
+    force: params.force ?? true,
+  });
+}
+
+export interface RunConvertParams {
+  action: ConvertActionUi;
+  inputs: string[];
+  format?: ImageFormatUi | null;
+  dpi?: number | null;
+  quality?: number | null;
+  pages?: string | null;
+  pageSize?: ConvertPageSizeUi | null;
+  marginPt?: number | null;
+  out?: string | null;
+  force?: boolean;
+}
+
+export async function runConvertCommand(params: RunConvertParams): Promise<ConvertReport> {
+  return await invoke<ConvertReport>('run_convert', {
+    action: params.action,
+    inputs: params.inputs,
+    format: params.format ?? null,
+    dpi: params.dpi ?? null,
+    quality: params.quality ?? null,
+    pages: params.pages ?? null,
+    pageSize: params.pageSize ?? null,
+    marginPt: params.marginPt ?? null,
     out: params.out ?? null,
     force: params.force ?? true,
   });

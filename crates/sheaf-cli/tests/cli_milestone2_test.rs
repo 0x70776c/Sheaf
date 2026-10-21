@@ -491,6 +491,7 @@ fn cli_subcommands_help_contain_examples() {
         "pages",
         "render",
         "compress",
+        "convert",
         "info",
         "verify",
         "capabilities",

@@ -220,7 +220,7 @@ pub fn render_clap_error(err: clap::Error, raw_args: &[String]) -> u8 {
 fn detect_op_from_args(raw_args: &[String]) -> &str {
     for arg in raw_args.iter().skip(1) {
         match arg.as_str() {
-            "merge" | "split" | "pages" | "render" | "compress" | "info" | "verify"
+            "merge" | "split" | "pages" | "render" | "compress" | "convert" | "info" | "verify"
             | "capabilities" => {
                 return arg.as_str();
             }
