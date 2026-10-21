@@ -86,7 +86,7 @@ impl CliProgress {
             }
             EffectiveProgressMode::Human | EffectiveProgressMode::None => {
                 if !quiet {
-                    let _ = writeln!(std::io::stderr(), "Warnung: {message}");
+                    let _ = writeln!(std::io::stderr(), "Warning: {message}");
                 }
             }
         }

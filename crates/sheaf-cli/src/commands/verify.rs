@@ -22,7 +22,7 @@ impl Command for VerifyArgs {
             None
         } else {
             Some(SheafError::InvalidPdf(
-                "Mindestens eine PDF-Datei ist ungültig.".to_string(),
+                "At least one PDF file failed verification.".to_string(),
             ))
         };
 
@@ -42,7 +42,7 @@ impl Command for VerifyArgs {
             }
             if f.valid {
                 let pages = f.pages.unwrap_or(0);
-                let _ = write!(out, "✓ {} ({pages} Seiten)", f.path.display());
+                let _ = write!(out, "✓ {} ({pages} pages)", f.path.display());
             } else {
                 let _ = write!(out, "✗ {} ({})", f.path.display(), f.problems.join("; "));
             }

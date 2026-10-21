@@ -143,7 +143,7 @@ fn inspect_single_file(path: &Path) -> Result<FileInfo, SheafError> {
     let pages_map = doc.get_pages();
     if pages_map.is_empty() {
         return Err(SheafError::InvalidPdf(format!(
-            "{}: Dokument enthält keine Seiten",
+            "{}: document contains no pages",
             path.display()
         )));
     }

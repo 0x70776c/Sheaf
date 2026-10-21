@@ -16,12 +16,10 @@ impl Command for SplitArgs {
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
         if self.combine && self.ranges.is_none() {
             return Err(SheafError::InvalidSelection(
-                "'--combine' kann nur zusammen mit '--ranges' verwendet werden.".to_string(),
+                "'--combine' can only be used together with '--ranges'.".to_string(),
             ));
         }
         let mode = if let Some(ref ranges_str) = self.ranges {
-            // Inspect input page count first so PageSelection::parse can resolve open ranges (`8-`)
-            // and report accurate PageOutOfRange / InvalidSelection errors.
             let info_report = info(std::slice::from_ref(&self.input), &sheaf_core::NoProgress)?;
             let file_info = info_report
                 .files
@@ -42,7 +40,7 @@ impl Command for SplitArgs {
             SplitMode::ByBookmarks { level }
         } else {
             return Err(SheafError::InvalidSelection(
-                "Bitte gib genau einen Split-Modus an (--ranges, --every oder --bookmarks-level)."
+                "Please specify a split mode (--ranges, --every, or --bookmarks-level)."
                     .to_string(),
             ));
         };
@@ -81,7 +79,7 @@ impl Command for SplitArgs {
             .display();
 
         let mut out = format!(
-            "{prefix}  {} ({} Seiten) → {} Dateien in {out_dir_display}/",
+            "{prefix}  {} ({} pages) → {} files in {out_dir_display}/",
             report.input.display(),
             report.input_pages,
             report.outputs.len(),
@@ -89,7 +87,7 @@ impl Command for SplitArgs {
 
         for item in &report.outputs {
             let file_name = item.path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            let _ = write!(out, "\n  {file_name:<20} {} S.", item.pages);
+            let _ = write!(out, "\n  {file_name:<20} {} p.", item.pages);
         }
 
         out

@@ -16,31 +16,31 @@ pub enum ProgressMode {
 /// Global flags available on every `sheaf` command.
 #[derive(Debug, Clone, Default, Args)]
 pub struct GlobalArgs {
-    /// Ausgabe als JSON-Envelope auf stdout
+    /// Output a single JSON envelope object on stdout
     #[arg(long, global = true)]
     pub json: bool,
 
-    /// Eingaben prüfen und Plan berechnen, aber keine Dateien schreiben
+    /// Validate inputs and compute execution plan without writing any files
     #[arg(long, global = true)]
     pub dry_run: bool,
 
-    /// Bestehende Ausgabedateien überschreiben
+    /// Overwrite existing output files
     #[arg(long, global = true)]
     pub force: bool,
 
-    /// Keine Human-Ausgabe außer Fehlern
+    /// Suppress human-readable output except errors
     #[arg(short, long, global = true)]
     pub quiet: bool,
 
-    /// Erweiterte Debug-Ausgaben auf stderr
+    /// Emit verbose debug logs on stderr
     #[arg(short, long, global = true)]
     pub verbose: bool,
 
-    /// Fortschrittsausgabe auf stderr (Standard: human bei TTY, sonst none)
+    /// Progress output mode on stderr (default: human on TTY, otherwise none)
     #[arg(long, value_enum, global = true)]
     pub progress: Option<ProgressMode>,
 
-    /// Farbige Konsolenausgabe deaktivieren (respektiert auch NO_COLOR)
+    /// Disable colored console output (also respects NO_COLOR)
     #[arg(long, global = true)]
     pub no_color: bool,
 }
@@ -49,8 +49,8 @@ pub struct GlobalArgs {
 #[command(
     name = "sheaf",
     version,
-    about = "Schnelles, 100 % offline arbeitendes PDF-Toolkit für macOS",
-    after_help = "Beispiele:\n  sheaf merge a.pdf b.pdf -o combined.pdf\n  sheaf split report.pdf --ranges \"1-3,8-\" -o out/\n  sheaf info report.pdf --json"
+    about = "Fast, 100% offline PDF toolkit for macOS",
+    after_help = "Examples:\n  sheaf merge a.pdf b.pdf -o combined.pdf\n  sheaf split report.pdf --ranges \"1-3,8-\" -o out/\n  sheaf pages rotate report.pdf --pages \"1-3\" --degrees 90 -o rotated.pdf\n  sheaf info report.pdf --json"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -62,42 +62,46 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Mehrere PDF-Dateien in einer neuen PDF-Datei zusammenführen
+    /// Merge multiple PDF files into a single output PDF
     #[command(
-        after_help = "Beispiele:\n  sheaf merge a.pdf b.pdf -o out.pdf\n  sheaf merge teil1.pdf teil2.pdf -o gesamt.pdf --force --json"
+        after_help = "Examples:\n  sheaf merge a.pdf b.pdf -o out.pdf\n  sheaf merge part1.pdf part2.pdf -o combined.pdf --force --json"
     )]
     Merge(MergeArgs),
 
-    /// Eine PDF-Datei nach Seitenbereichen, Blöcken oder Lesezeichen aufteilen
+    /// Split a PDF file by page ranges, fixed chunks, or bookmark levels
     #[command(
-        after_help = "Beispiele:\n  sheaf split report.pdf --ranges \"1-3,5,8-\" -o out/\n  sheaf split report.pdf --every 2 -o out/\n  sheaf split report.pdf --bookmarks-level 1 -o out/ --json"
+        after_help = "Examples:\n  sheaf split report.pdf --ranges \"1-3,5,8-\" -o out/\n  sheaf split report.pdf --every 2 -o out/\n  sheaf split report.pdf --bookmarks-level 1 -o out/ --json"
     )]
     Split(SplitArgs),
 
-    /// Struktur- und Metadaten-Informationen zu PDF-Dateien anzeigen
+    /// Page-level operations: rotate, delete, reorder, or extract pages
     #[command(
-        after_help = "Beispiele:\n  sheaf info dokument.pdf\n  sheaf info a.pdf b.pdf --json"
+        after_help = "Examples:\n  sheaf pages rotate report.pdf --pages \"1-3\" --degrees 90 -o rotated.pdf\n  sheaf pages delete report.pdf --pages \"2,5-7\" -o cleaned.pdf\n  sheaf pages reorder report.pdf --order \"3,1,2,4-\" -o reordered.pdf\n  sheaf pages extract report.pdf --pages \"1,4-6\" -o subset.pdf"
     )]
+    Pages(PagesArgs),
+
+    /// Inspect structural properties and metadata of PDF files
+    #[command(after_help = "Examples:\n  sheaf info document.pdf\n  sheaf info a.pdf b.pdf --json")]
     Info(InfoArgs),
 
-    /// PDF-Dateien auf strukturelle Gültigkeit prüfen
+    /// Verify PDF files for structural integrity
     #[command(
-        after_help = "Beispiele:\n  sheaf verify dokument.pdf\n  sheaf verify *.pdf --deep --json"
+        after_help = "Examples:\n  sheaf verify document.pdf\n  sheaf verify *.pdf --deep --json"
     )]
     Verify(VerifyArgs),
 
-    /// Unterstützte Befehle, Flags, Exit-Codes und externe Tools beschreiben
-    #[command(after_help = "Beispiele:\n  sheaf capabilities --json\n  sheaf capabilities")]
+    /// Describe supported commands, flags, exit codes, and external tools
+    #[command(after_help = "Examples:\n  sheaf capabilities --json\n  sheaf capabilities")]
     Capabilities(CapabilitiesArgs),
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct MergeArgs {
-    /// Eingabe-PDFs in der gewünschten Reihenfolge
+    /// Input PDF files in the desired merge order
     #[arg(required = true)]
     pub inputs: Vec<PathBuf>,
 
-    /// Ausgabedatei
+    /// Target output PDF file
     #[arg(short, long)]
     pub out: PathBuf,
 }
@@ -109,44 +113,137 @@ pub struct MergeArgs {
         .args(["ranges", "every", "bookmarks_level"])
 ))]
 pub struct SplitArgs {
-    /// Eingabe-PDF-Datei
+    /// Input PDF file
     pub input: PathBuf,
 
-    /// Seitenbereiche (z. B. "1-3,5,8-")
+    /// Page ranges to split (e.g. "1-3,5,8-")
     #[arg(long)]
     pub ranges: Option<String>,
 
-    /// Alle N Seiten aufteilen
+    /// Split every N pages
     #[arg(long)]
     pub every: Option<u32>,
 
-    /// Nach Lesezeichen auf Ebene N aufteilen (1 = oberste Ebene)
+    /// Split by bookmarks at hierarchy level N (1 = top level)
     #[arg(long)]
     pub bookmarks_level: Option<u8>,
 
-    /// Ausgewählte Seitenbereiche in einer einzigen Datei zusammenfassen (nur mit --ranges)
+    /// Combine selected page ranges into a single PDF file (only valid with --ranges)
     #[arg(long, requires = "ranges", conflicts_with_all = ["every", "bookmarks_level"])]
     pub combine: bool,
 
-    /// Zielverzeichnis für die erzeugten PDF-Dateien (Standard: Ordner der Eingabedatei)
+    /// Output directory for generated PDF files (defaults to input file directory)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct PagesArgs {
+    #[command(subcommand)]
+    pub action: PagesSubcommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum PagesSubcommand {
+    /// Rotate selected pages (or all pages) additively by 90, 180, or 270 degrees
+    #[command(
+        after_help = "Examples:\n  sheaf pages rotate input.pdf --degrees 90 -o rotated.pdf\n  sheaf pages rotate input.pdf --pages \"1,3-5\" --degrees 180 -o rotated.pdf --json"
+    )]
+    Rotate(PagesRotateArgs),
+
+    /// Delete selected pages from a PDF file
+    #[command(
+        after_help = "Examples:\n  sheaf pages delete input.pdf --pages \"2,4-6\" -o out.pdf\n  sheaf pages delete input.pdf --pages \"1\" -o without_cover.pdf --json"
+    )]
+    Delete(PagesDeleteArgs),
+
+    /// Reorder pages according to a page range sequence
+    #[command(
+        after_help = "Examples:\n  sheaf pages reorder input.pdf --order \"3,1,2,4-\" -o reordered.pdf\n  sheaf pages reorder input.pdf --order \"2,1\" -o swapped.pdf --json"
+    )]
+    Reorder(PagesReorderArgs),
+
+    /// Extract selected pages into a new PDF file
+    #[command(
+        after_help = "Examples:\n  sheaf pages extract input.pdf --pages \"1-3,8\" -o extracted.pdf\n  sheaf pages extract input.pdf --pages \"5-\" -o tail.pdf --json"
+    )]
+    Extract(PagesExtractArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct PagesRotateArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Page ranges to rotate (e.g. "1-3,5"; omit to rotate all pages)
+    #[arg(long)]
+    pub pages: Option<String>,
+
+    /// Clockwise rotation angle in degrees (90, 180, 270, or -90)
+    #[arg(long, allow_hyphen_values = true)]
+    pub degrees: i32,
+
+    /// Target output PDF file (defaults to {stem}_rotated.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct PagesDeleteArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Page ranges to delete (e.g. "2,5-7")
+    #[arg(long)]
+    pub pages: String,
+
+    /// Target output PDF file (defaults to {stem}_deleted.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct PagesReorderArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// New page order specification (e.g. "3,1,2,4-")
+    #[arg(long)]
+    pub order: String,
+
+    /// Target output PDF file (defaults to {stem}_reordered.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct PagesExtractArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Page ranges to extract into a new PDF (e.g. "1-3,5")
+    #[arg(long)]
+    pub pages: String,
+
+    /// Target output PDF file (defaults to {stem}_extracted.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct InfoArgs {
-    /// Zu untersuchende PDF-Dateien
+    /// PDF files to inspect
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct VerifyArgs {
-    /// Zu prüfende PDF-Dateien
+    /// PDF files to verify
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
 
-    /// Zusätzlich qpdf --check ausführen (falls installiert)
+    /// Also run qpdf --check if installed
     #[arg(long)]
     pub deep: bool,
 }

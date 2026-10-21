@@ -27,6 +27,18 @@ expression: cap_val
       },
       {
         "args": [
+          "rotate|delete|reorder|extract",
+          "input",
+          "--pages",
+          "--order",
+          "--degrees",
+          "-o"
+        ],
+        "name": "pages",
+        "status": "stable"
+      },
+      {
+        "args": [
           "file..."
         ],
         "name": "info",

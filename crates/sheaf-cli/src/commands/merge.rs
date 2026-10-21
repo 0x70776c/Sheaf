@@ -32,7 +32,7 @@ impl Command for MergeArgs {
             "✓ merge"
         };
         format!(
-            "{prefix}  {} Dateien ({} Seiten) → {}",
+            "{prefix}  {} files ({} pages) → {}",
             report.inputs.len(),
             report.pages_total,
             report.output.display()

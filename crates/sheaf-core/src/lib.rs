@@ -17,6 +17,10 @@ pub use error::SheafError;
 pub use ops::capabilities::{CapabilitiesReport, capabilities};
 pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
+pub use ops::pages::{
+    PageOpOptions, PagesReport, delete_pages, extract_pages, get_effective_page_rotation,
+    normalize_rotation_degrees, reorder_pages, rotate_pages,
+};
 pub use ops::split::{PageSelection, SplitMode, SplitOptions, SplitOutput, SplitReport, split};
 pub use ops::verify::{VerifyFileResult, VerifyOptions, VerifyReport, verify};
 pub use progress::{NoProgress, Progress};

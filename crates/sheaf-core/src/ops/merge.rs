@@ -122,7 +122,7 @@ pub fn merge_with_options(
         if !path.exists() {
             return Err(SheafError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("Datei nicht gefunden: {}", path.display()),
+                format!("File not found: {}", path.display()),
             )));
         }
 
@@ -141,7 +141,7 @@ pub fn merge_with_options(
         let pages = doc.get_pages();
         if pages.is_empty() {
             return Err(SheafError::InvalidPdf(format!(
-                "{}: Dokument enthält keine Seiten",
+                "{}: document contains no pages",
                 path.display()
             )));
         }
@@ -207,11 +207,11 @@ pub fn merge_with_options(
     }
 
     let (pages_id, mut pages_dict) = pages_object.ok_or_else(|| {
-        SheafError::InvalidPdf("Kein gültiges Pages-Objekt in den Eingabedateien".to_string())
+        SheafError::InvalidPdf("No valid Pages object found in input files".to_string())
     })?;
 
     let (catalog_id, mut catalog_dict) = catalog_object.ok_or_else(|| {
-        SheafError::InvalidPdf("Kein gültiges Catalog-Objekt in den Eingabedateien".to_string())
+        SheafError::InvalidPdf("No valid Catalog object found in input files".to_string())
     })?;
 
     let mut kids = Vec::with_capacity(documents_pages.len());

@@ -71,6 +71,18 @@ pub fn capabilities() -> CapabilitiesReport {
             status: "stable",
         },
         CommandCapability {
+            name: "pages",
+            args: vec![
+                "rotate|delete|reorder|extract",
+                "input",
+                "--pages",
+                "--order",
+                "--degrees",
+                "-o",
+            ],
+            status: "stable",
+        },
+        CommandCapability {
             name: "info",
             args: vec!["file..."],
             status: "stable",

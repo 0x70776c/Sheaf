@@ -26,7 +26,7 @@ impl Command for CapabilitiesArgs {
     fn format_human(&self, report: &Self::Report, _dry_run: bool) -> String {
         let mut out = String::new();
         let _ = writeln!(out, "sheaf v{} (Schema {})", report.version, report.schema);
-        let _ = writeln!(out, "Befehle:");
+        let _ = writeln!(out, "Commands:");
         for cmd in &report.commands {
             let _ = writeln!(
                 out,

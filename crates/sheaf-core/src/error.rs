@@ -3,28 +3,28 @@ use thiserror::Error;
 
 /// Error type for all Sheaf PDF operations.
 ///
-/// Messages are formatted in German to be user-friendly, while [`SheafError::code`]
-/// provides a stable English identifier for JSON and machine consumers.
+/// Messages are formatted in clear, user-friendly English, while [`SheafError::code`]
+/// provides a stable identifier for JSON and machine consumers.
 #[derive(Debug, Error)]
 pub enum SheafError {
     /// File system read/write error.
-    #[error("Dateifehler: {0}")]
+    #[error("File I/O error: {0}")]
     Io(#[from] std::io::Error),
 
     /// The input file is not a valid or supported PDF document.
-    #[error("Ungültige oder beschädigte PDF-Datei: {0}")]
+    #[error("Invalid or corrupted PDF file: {0}")]
     InvalidPdf(String),
 
     /// The PDF document is password-protected and requires unlocking.
-    #[error("Datei ist passwortgeschützt")]
+    #[error("File is password-protected")]
     Encrypted,
 
     /// The provided password is incorrect.
-    #[error("Das eingegebene Passwort ist falsch")]
+    #[error("Incorrect password")]
     WrongPassword,
 
     /// A requested 1-based page number exceeds the document's page count or is 0.
-    #[error("Seite {page} existiert nicht (Dokument hat {total} Seiten).")]
+    #[error("Page {page} is out of range (document has {total} pages)")]
     PageOutOfRange {
         /// The requested 1-based page number.
         page: u32,
@@ -33,23 +33,23 @@ pub enum SheafError {
     },
 
     /// No pages or input files were selected for the operation.
-    #[error("Keine Seiten oder Dateien ausgewählt")]
+    #[error("No pages or files selected")]
     EmptySelection,
 
     /// Invalid page range syntax or invalid selection argument (e.g. `5-3`, `abc`, `N=0`).
-    #[error("Ungültige Auswahl: {0}")]
+    #[error("Invalid selection: {0}")]
     InvalidSelection(String),
 
     /// Target output file already exists and `--force` was not set.
-    #[error("Ausgabedatei existiert bereits: {}", .0.display())]
+    #[error("Output file already exists: {}", .0.display())]
     OutputExists(PathBuf),
 
     /// The PDF uses a feature that is not supported or lacks required elements (e.g. outlines).
-    #[error("Nicht unterstützt: {0}")]
+    #[error("Unsupported feature: {0}")]
     Unsupported(String),
 
     /// The operation was cancelled by the user.
-    #[error("Vorgang abgebrochen")]
+    #[error("Operation cancelled")]
     Cancelled,
 }
 
@@ -92,28 +92,26 @@ impl SheafError {
     /// ```
     pub fn hint(&self) -> Option<String> {
         match self {
-            Self::Io(_) => Some("Prüfe Pfad und Zugriffsrechte.".to_string()),
-            Self::InvalidPdf(_) => Some("Prüfe die Datei mit 'sheaf verify <datei>'.".to_string()),
-            Self::Encrypted => {
-                Some("Entferne zuerst den Passwortschutz der PDF-Datei.".to_string())
-            }
-            Self::WrongPassword => Some("Bitte prüfe das eingegebene Passwort.".to_string()),
+            Self::Io(_) => Some("Check the file path and permissions.".to_string()),
+            Self::InvalidPdf(_) => Some("Verify the file with 'sheaf verify <file>'.".to_string()),
+            Self::Encrypted => Some("Unlock or remove the password protection first.".to_string()),
+            Self::WrongPassword => Some("Please check the provided password.".to_string()),
             Self::PageOutOfRange { total, .. } => {
                 if *total > 0 {
-                    Some(format!("Gültiger Bereich: 1-{total}."))
+                    Some(format!("Valid page range: 1-{total}."))
                 } else {
-                    Some("Das Dokument enthält keine Seiten.".to_string())
+                    Some("The document contains no pages.".to_string())
                 }
             }
             Self::EmptySelection => {
-                Some("Gib mindestens eine Datei oder einen Seitenbereich an.".to_string())
+                Some("Provide at least one input file or page range.".to_string())
             }
             Self::InvalidSelection(_) => {
-                Some("Erwartetes Format für Seitenbereiche: z. B. '1-3,5,8-'.".to_string())
+                Some("Expected page range format: e.g. '1-3,5,8-'.".to_string())
             }
-            Self::OutputExists(_) => Some(
-                "Verwende '--force', um bestehende Ausgabedateien zu überschreiben.".to_string(),
-            ),
+            Self::OutputExists(_) => {
+                Some("Use '--force' to overwrite existing output files.".to_string())
+            }
             Self::Unsupported(msg) => Some(msg.clone()),
             Self::Cancelled => None,
         }
@@ -162,14 +160,14 @@ pub(crate) fn ensure_not_overwriting_inputs(
     for input in inputs {
         if input == out {
             return Err(SheafError::InvalidSelection(
-                "Ausgabedatei darf die Eingabedatei nicht überschreiben".to_string(),
+                "Output file must not overwrite an input file".to_string(),
             ));
         }
         if let (Some(in_can), Some(out_can)) = (std::fs::canonicalize(input).ok(), &out_canonical)
             && &in_can == out_can
         {
             return Err(SheafError::InvalidSelection(
-                "Ausgabedatei darf die Eingabedatei nicht überschreiben".to_string(),
+                "Output file must not overwrite an input file".to_string(),
             ));
         }
     }

@@ -290,7 +290,7 @@ fn merge_encrypted_pdf_returns_encrypted_error() {
         matches!(err, SheafError::Encrypted),
         "Expected SheafError::Encrypted, got: {err:?}"
     );
-    assert_eq!(err.to_string(), "Datei ist passwortgeschützt");
+    assert_eq!(err.to_string(), "File is password-protected");
 }
 
 #[test]

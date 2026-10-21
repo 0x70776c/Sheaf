@@ -104,7 +104,7 @@ pub fn verify(
         if !path.exists() {
             return Err(SheafError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("Datei nicht gefunden: {}", path.display()),
+                format!("File not found: {}", path.display()),
             )));
         }
     }
@@ -114,7 +114,7 @@ pub fn verify(
         let found = find_qpdf();
         if found.is_none() {
             warnings.push(
-                "qpdf nicht im PATH gefunden – führe nur interne Strukturprüfung aus.".to_string(),
+                "qpdf not found in PATH – running internal structural check only.".to_string(),
             );
         }
         found
@@ -146,7 +146,7 @@ fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
     let doc = match Document::load(path) {
         Ok(d) => d,
         Err(e) => {
-            problems.push(format!("PDF konnte nicht geladen werden: {e}"));
+            problems.push(format!("Failed to load PDF: {e}"));
             return VerifyFileResult {
                 path: path.to_path_buf(),
                 valid: false,
@@ -157,7 +157,7 @@ fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
     };
 
     if doc.is_encrypted() {
-        problems.push("Dokument ist verschlüsselt.".to_string());
+        problems.push("Document is encrypted.".to_string());
         return VerifyFileResult {
             path: path.to_path_buf(),
             valid: false,
@@ -167,12 +167,12 @@ fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
     }
 
     if let Err(e) = doc.catalog() {
-        problems.push(format!("Catalog fehlt oder ist ungültig: {e}"));
+        problems.push(format!("Catalog missing or invalid: {e}"));
     }
 
     let pages = doc.get_pages();
     if pages.is_empty() {
-        problems.push("Dokument enthält keine Seiten (Seitenzahl = 0).".to_string());
+        problems.push("Document contains no pages (page count = 0).".to_string());
     }
 
     for (page_num, page_id) in &pages {
@@ -181,7 +181,7 @@ fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
                 for content_id in doc.get_page_contents(*page_id) {
                     if doc.get_object(content_id).is_err() {
                         problems.push(format!(
-                            "Seite {page_num}: Content-Stream {content_id:?} nicht auflösbar"
+                            "Page {page_num}: content stream {content_id:?} could not be resolved"
                         ));
                     }
                 }
@@ -189,13 +189,13 @@ fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
                     && doc.get_object(res_ref).is_err()
                 {
                     problems.push(format!(
-                        "Seite {page_num}: Resources-Objekt {res_ref:?} nicht auflösbar"
+                        "Page {page_num}: Resources object {res_ref:?} could not be resolved"
                     ));
                 }
             }
             Err(e) => {
                 problems.push(format!(
-                    "Seite {page_num} ({page_id:?}) ist kein gültiges Dictionary: {e}"
+                    "Page {page_num} ({page_id:?}) is not a valid dictionary: {e}"
                 ));
             }
         }
@@ -209,13 +209,11 @@ fn verify_single_file(path: &Path, qpdf_bin: Option<&str>) -> VerifyFileResult {
                     let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
                     let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
                     let detail = if !stderr.is_empty() { stderr } else { stdout };
-                    problems.push(format!(
-                        "qpdf --check fehlgeschlagen (Exit {code}): {detail}"
-                    ));
+                    problems.push(format!("qpdf --check failed (exit {code}): {detail}"));
                 }
             }
             Err(e) => {
-                problems.push(format!("qpdf-Aufruf fehlgeschlagen: {e}"));
+                problems.push(format!("qpdf invocation failed: {e}"));
             }
         }
     }

@@ -29,19 +29,19 @@ impl Command for InfoArgs {
                 out.push('\n');
             }
             let pages_str = match f.pages {
-                Some(p) => format!("{p} Seiten"),
-                None => "verschlüsselt".to_string(),
+                Some(p) => format!("{p} pages"),
+                None => "encrypted".to_string(),
             };
             let _ = write!(
                 out,
-                "{}  (PDF {}, {}, {} Bytes)",
+                "{}  (PDF {}, {}, {} bytes)",
                 f.path.display(),
                 f.pdf_version,
                 pages_str,
                 f.size_bytes
             );
             if f.has_outlines {
-                let _ = write!(out, " · {} Lesezeichen", f.outline_count);
+                let _ = write!(out, " · {} bookmarks", f.outline_count);
             }
         }
         out

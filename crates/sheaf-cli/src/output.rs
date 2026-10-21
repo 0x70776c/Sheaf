@@ -63,7 +63,6 @@ pub fn render_success<T: Serialize>(
     progress: &CliProgress,
 ) {
     if global.json {
-        // When --progress json is also enabled, emit warnings as NDJSON on stderr as well
         if progress.mode() == EffectiveProgressMode::Json {
             for w in &warnings {
                 progress.emit_warning(w, global.quiet);
@@ -112,9 +111,9 @@ pub fn render_error(op: &str, err: &SheafError, global: &GlobalArgs) -> u8 {
         }
     } else {
         let mut stderr = std::io::stderr();
-        let _ = writeln!(stderr, "Fehler: {err}");
+        let _ = writeln!(stderr, "Error: {err}");
         if let Some(hint) = err.hint() {
-            let _ = writeln!(stderr, "Hinweis: {hint}");
+            let _ = writeln!(stderr, "Hint: {hint}");
         }
     }
     code_num
@@ -166,9 +165,9 @@ pub fn render_error_with_data<T: Serialize>(
             let _ = writeln!(std::io::stdout(), "{human_summary}");
         }
         let mut stderr = std::io::stderr();
-        let _ = writeln!(stderr, "Fehler: {err}");
+        let _ = writeln!(stderr, "Error: {err}");
         if let Some(hint) = err.hint() {
-            let _ = writeln!(stderr, "Hinweis: {hint}");
+            let _ = writeln!(stderr, "Hint: {hint}");
         }
     }
     code_num
@@ -179,7 +178,6 @@ pub fn render_error_with_data<T: Serialize>(
 pub fn render_clap_error(err: clap::Error, raw_args: &[String]) -> u8 {
     let json_requested = raw_args.iter().any(|a| a == "--json");
 
-    // Help / Version are informational (exit code 0) unless an actual parse error occurred
     if matches!(
         err.kind(),
         clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
@@ -194,7 +192,7 @@ pub fn render_clap_error(err: clap::Error, raw_args: &[String]) -> u8 {
         let first_line = msg
             .lines()
             .find(|l| !l.trim().is_empty())
-            .unwrap_or("Ungültige Kommandozeilenargumente")
+            .unwrap_or("Invalid command-line arguments")
             .trim()
             .to_string();
 
@@ -206,7 +204,7 @@ pub fn render_clap_error(err: clap::Error, raw_args: &[String]) -> u8 {
                 code: "invalid_selection",
                 exit_code: EXIT_USAGE,
                 message: first_line,
-                hint: Some("Verwende '--help' für gültige Optionen und Beispiele.".to_string()),
+                hint: Some("Run with '--help' for valid options and examples.".to_string()),
             },
         };
         if let Ok(json_str) = serde_json::to_string(&env) {
@@ -222,7 +220,9 @@ pub fn render_clap_error(err: clap::Error, raw_args: &[String]) -> u8 {
 fn detect_op_from_args(raw_args: &[String]) -> &str {
     for arg in raw_args.iter().skip(1) {
         match arg.as_str() {
-            "merge" | "split" | "info" | "verify" | "capabilities" => return arg.as_str(),
+            "merge" | "split" | "pages" | "info" | "verify" | "capabilities" => {
+                return arg.as_str();
+            }
             _ => {}
         }
     }

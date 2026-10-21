@@ -1,0 +1,23 @@
+---
+source: crates/sheaf-cli/tests/cli_pages_test.rs
+expression: ext_val
+---
+{
+  "data": {
+    "action": "extract",
+    "input": "input.pdf",
+    "input_pages": 3,
+    "output": "extracted.pdf",
+    "output_pages": 2,
+    "pages_affected": [
+      2,
+      3
+    ]
+  },
+  "dry_run": false,
+  "duration_ms": "[duration_ms]",
+  "ok": true,
+  "op": "pages",
+  "schema": 1,
+  "warnings": []
+}

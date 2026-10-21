@@ -54,7 +54,7 @@ impl PageSelection {
             let token = raw_token.trim();
             if token.is_empty() {
                 return Err(SheafError::InvalidSelection(
-                    "Leeres Bereichs-Token in der Seitenauswahl".to_string(),
+                    "Empty range token in page selection".to_string(),
                 ));
             }
 
@@ -62,7 +62,7 @@ impl PageSelection {
                 // Reject multiple hyphens like "1--3" or "1-2-3"
                 if right.contains('-') {
                     return Err(SheafError::InvalidSelection(format!(
-                        "Ungültiges Bereichsformat '{token}'"
+                        "Invalid range format '{token}'"
                     )));
                 }
 
@@ -71,7 +71,7 @@ impl PageSelection {
 
                 if left.is_empty() && right.is_empty() {
                     return Err(SheafError::InvalidSelection(
-                        "Ungültiger Bereich '-'".to_string(),
+                        "Invalid range '-'".to_string(),
                     ));
                 }
 
@@ -95,7 +95,7 @@ impl PageSelection {
 
                 if start > end {
                     return Err(SheafError::InvalidSelection(format!(
-                        "Startseite ({start}) darf nicht größer als Endseite ({end}) sein ('{token}')"
+                        "Start page ({start}) must not be greater than end page ({end}) ('{token}')"
                     )));
                 }
 
@@ -123,17 +123,34 @@ impl PageSelection {
     pub fn ranges(&self) -> &[RangeInclusive<u32>] {
         &self.0
     }
+
+    /// Expands all ranges into a flat `Vec<u32>` of 1-based page numbers in the exact order specified.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sheaf_core::PageSelection;
+    ///
+    /// let sel = PageSelection::parse("1-2, 5, 2", 6).unwrap();
+    /// assert_eq!(sel.to_page_numbers(), vec![1, 2, 5, 2]);
+    /// ```
+    pub fn to_page_numbers(&self) -> Vec<u32> {
+        let mut pages = Vec::new();
+        for r in &self.0 {
+            pages.extend(r.clone());
+        }
+        pages
+    }
 }
 
 fn parse_page_num(s: &str, full_token: &str) -> Result<u32, SheafError> {
     if !s.chars().all(|c| c.is_ascii_digit()) {
         return Err(SheafError::InvalidSelection(format!(
-            "Ungültige Seitenzahl in '{full_token}'"
+            "Invalid page number in '{full_token}'"
         )));
     }
-    s.parse::<u32>().map_err(|_| {
-        SheafError::InvalidSelection(format!("Ungültige Seitenzahl in '{full_token}'"))
-    })
+    s.parse::<u32>()
+        .map_err(|_| SheafError::InvalidSelection(format!("Invalid page number in '{full_token}'")))
 }
 
 fn check_page_bounds(page: u32, total: u32) -> Result<(), SheafError> {
@@ -262,7 +279,7 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
     if !src.exists() {
         return Err(SheafError::Io(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            format!("Datei nicht gefunden: {}", src.display()),
+            format!("File not found: {}", src.display()),
         )));
     }
 
@@ -274,7 +291,7 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
     let pages_map = doc.get_pages();
     if pages_map.is_empty() {
         return Err(SheafError::InvalidPdf(format!(
-            "{}: Dokument enthält keine Seiten",
+            "{}: document contains no pages",
             src.display()
         )));
     }
@@ -350,7 +367,7 @@ fn resolve_out_dir(src: &Path, configured: &Path) -> PathBuf {
     }
 }
 
-fn sanitize_stem(src: &Path) -> String {
+pub(crate) fn sanitize_stem(src: &Path) -> String {
     let raw = src
         .file_stem()
         .and_then(|s| s.to_str())
@@ -384,7 +401,7 @@ fn plan_outputs(
                 check_page_bounds(*r.end(), total_pages)?;
                 if r.start() > r.end() {
                     return Err(SheafError::InvalidSelection(format!(
-                        "Ungültiger Bereich {}-{}",
+                        "Invalid range {}-{}",
                         r.start(),
                         r.end()
                     )));
@@ -449,7 +466,7 @@ fn plan_outputs(
         SplitMode::EveryN(n) => {
             if *n == 0 {
                 return Err(SheafError::InvalidSelection(
-                    "Blockgröße N bei --every muss mindestens 1 sein".to_string(),
+                    "Chunk size N for --every must be at least 1".to_string(),
                 ));
             }
             let num_parts = total_pages.div_ceil(*n);
@@ -480,7 +497,7 @@ fn plan_outputs(
         SplitMode::ByBookmarks { level } => {
             if *level == 0 {
                 return Err(SheafError::InvalidSelection(
-                    "Lesezeichen-Ebene muss mindestens 1 sein".to_string(),
+                    "Bookmark level must be at least 1".to_string(),
                 ));
             }
             plan_by_bookmarks(doc, total_pages, stem, out_dir, *level, warnings)
@@ -517,7 +534,7 @@ fn plan_by_bookmarks(
             }
             _ => {
                 warnings.push(format!(
-                    "Lesezeichen ohne Ziel übersprungen: {}",
+                    "Skipped bookmark without valid destination: {}",
                     entry.title
                 ));
             }
@@ -526,7 +543,7 @@ fn plan_by_bookmarks(
 
     if valid_bookmarks.is_empty() {
         return Err(SheafError::Unsupported(format!(
-            "Dokument hat keine Lesezeichen auf Ebene {target_level}"
+            "Document has no bookmarks at level {target_level}"
         )));
     }
 
@@ -537,7 +554,7 @@ fn plan_by_bookmarks(
             && page < *last_page
         {
             warnings.push(format!(
-                "Lesezeichen mit rückwärtsgewandter Seitenzahl ({page}) übersprungen: {title}"
+                "Skipped bookmark with backward page target ({page}): {title}"
             ));
             continue;
         }
@@ -789,7 +806,7 @@ pub fn slugify(title: &str) -> String {
 
 /// Builds a standalone PDF document containing the 1-based `selected_pages` from `base_doc`
 /// in the exact order specified (supporting duplicates and arbitrary ordering).
-fn build_subset_document(
+pub(crate) fn build_subset_document(
     base_doc: &Document,
     pages_map: &BTreeMap<u32, ObjectId>,
     selected_pages: &[u32],
