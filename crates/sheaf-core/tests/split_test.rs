@@ -8,7 +8,7 @@ use lopdf::{Bookmark, Document, Object, Stream, dictionary};
 use proptest::prelude::*;
 use sheaf_core::fs::write_atomic;
 use sheaf_core::{
-    LoadOptions, NoProgress, PageSelection, SheafError, SplitMode, SplitOptions, split,
+    LoadOptions, NoProgress, PageSelection, SheafError, SplitMode, SplitOptions, load_pdf, split,
 };
 
 static INIT_SPLIT_FIXTURES: Once = Once::new();
@@ -150,7 +150,9 @@ fn ensure_split_fixtures() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]

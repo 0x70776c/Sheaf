@@ -31,9 +31,15 @@ impl Command for NumberArgs {
         };
         let report = number(&self.input, &opts, &ctx.progress)?;
 
+        let mut warnings = resolver.warnings;
+        if report.was_encrypted {
+            warnings
+                .push("Eingabe war verschlüsselt, Ausgabe ist nicht verschlüsselt.".to_string());
+        }
+
         Ok(Outcome {
             report,
-            warnings: resolver.warnings,
+            warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })

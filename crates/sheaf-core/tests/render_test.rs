@@ -8,7 +8,7 @@ use lopdf::{
 };
 use sheaf_core::{
     DEFAULT_THUMBNAIL_WIDTH_PX, LoadOptions, NoProgress, RenderOptions, RenderScale, SheafError,
-    render_page, render_thumbnails, render_with_options, thumbnail_cache_key,
+    load_pdf, render_page, render_thumbnails, render_with_options, thumbnail_cache_key,
 };
 
 fn fixtures_dir() -> PathBuf {
@@ -24,8 +24,8 @@ fn fixtures_dir() -> PathBuf {
 fn ensure_500p_fixture() -> PathBuf {
     let path = fixtures_dir().join("fixture_500p.pdf");
     if path.exists()
-        && let Ok(doc) = Document::load(&path)
-        && doc.get_pages().len() == 500
+        && let Ok(loaded) = load_pdf(&path, &LoadOptions::none())
+        && loaded.doc.get_pages().len() == 500
     {
         return path;
     }

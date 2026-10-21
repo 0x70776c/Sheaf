@@ -6,8 +6,8 @@ use lopdf::{Document, Object, Stream, StringFormat, dictionary};
 use sheaf_core::{
     LoadOptions, NoProgress, NumberOptions, NumberPosition, OverlayPosition, PageOverlaySpec,
     RenderOptions, RenderScale, SheafError, WatermarkOptions, WatermarkPosition,
-    apply_overlay_to_page, format_page_number, get_effective_page_box, is_pdfium_available, number,
-    render_with_options, watermark,
+    apply_overlay_to_page, format_page_number, get_effective_page_box, is_pdfium_available,
+    load_pdf, number, render_with_options, watermark,
 };
 use tempfile::TempDir;
 
@@ -37,7 +37,7 @@ fn test_overlay_audit_01_shared_engine() {
     let report = watermark(&src, &opts, &NoProgress).unwrap();
     assert_eq!(report.pages_watermarked, vec![1, 2, 3]);
 
-    let doc = Document::load(&out).unwrap();
+    let doc = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let page1_id = *doc.get_pages().get(&1).unwrap();
     let page_dict = doc.get_dictionary(page1_id).unwrap();
     let res = page_dict.get(b"Resources").unwrap().as_dict().unwrap();
@@ -102,7 +102,7 @@ fn test_overlay_audit_02_original_content_encapsulated_in_q_q() {
     };
     watermark(&src, &opts, &NoProgress).unwrap();
 
-    let res_doc = Document::load(&out).unwrap();
+    let res_doc = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let res_page_id = *res_doc.get_pages().get(&1).unwrap();
     let res_page = res_doc.get_dictionary(res_page_id).unwrap();
     let contents_arr = res_page.get(b"Contents").unwrap().as_array().unwrap();
@@ -191,7 +191,7 @@ fn test_overlay_audit_03_inherited_and_indirect_resources_copied_parent_unmodifi
     };
     watermark(&src, &opts, &NoProgress).unwrap();
 
-    let res_doc = Document::load(&out).unwrap();
+    let res_doc = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let pages_map = res_doc.get_pages();
     let p1 = res_doc.get_dictionary(*pages_map.get(&1).unwrap()).unwrap();
     let p1_res = p1.get(b"Resources").unwrap().as_dict().unwrap();
@@ -226,7 +226,7 @@ fn test_overlay_audit_04a_contents_single_reference() {
     let src = fixture_path("fixture_c_1p.pdf");
     let out = dir.path().join("single_ref_wm.pdf");
 
-    let doc_in = Document::load(&src).unwrap();
+    let doc_in = load_pdf(&src, &LoadOptions::none()).unwrap().doc;
     let p1_in = doc_in
         .get_dictionary(*doc_in.get_pages().get(&1).unwrap())
         .unwrap();
@@ -242,7 +242,7 @@ fn test_overlay_audit_04a_contents_single_reference() {
     };
     watermark(&src, &opts, &NoProgress).unwrap();
 
-    let doc_out = Document::load(&out).unwrap();
+    let doc_out = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let extracted = doc_out.extract_text(&[1]).unwrap();
     assert!(extracted.contains("REF-TEST"));
 }
@@ -323,7 +323,7 @@ fn test_overlay_audit_04b_contents_array() {
     };
     watermark(&src, &opts, &NoProgress).unwrap();
 
-    let doc_out = Document::load(&out).unwrap();
+    let doc_out = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let text = doc_out.extract_text(&[1]).unwrap();
     assert!(text.contains("PartOne"));
     assert!(text.contains("PartTwo"));
@@ -365,7 +365,7 @@ fn test_overlay_audit_04c_contents_empty() {
     };
     watermark(&src, &opts, &NoProgress).unwrap();
 
-    let doc_out = Document::load(&out).unwrap();
+    let doc_out = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let text = doc_out.extract_text(&[1]).unwrap();
     assert!(text.contains("EMPTY-PAGE-WM"));
 }
@@ -480,7 +480,7 @@ fn test_overlay_audit_06_mediabox_offset_and_cropbox() {
     doc.trailer.set("Root", catalog_id);
     doc.save(&src).unwrap();
 
-    let loaded = Document::load(&src).unwrap();
+    let loaded = load_pdf(&src, &LoadOptions::none()).unwrap().doc;
     let pid = *loaded.get_pages().get(&1).unwrap();
     let pbox = get_effective_page_box(&loaded, pid);
     assert_eq!(pbox.x0, 150.0);
@@ -524,7 +524,7 @@ fn test_overlay_audit_07_resource_names_collision_free() {
     )
     .unwrap();
 
-    let doc = Document::load(&out).unwrap();
+    let doc = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let pid = *doc.get_pages().get(&1).unwrap();
     let res = doc
         .get_dictionary(pid)
@@ -585,7 +585,7 @@ fn test_overlay_audit_09_opacity_via_extgstate_ca() {
     )
     .unwrap();
 
-    let doc = Document::load(&out).unwrap();
+    let doc = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let pid = *doc.get_pages().get(&1).unwrap();
     let res = doc
         .get_dictionary(pid)
@@ -609,7 +609,7 @@ fn test_overlay_audit_10_text_remains_selectable() {
     let src = fixture_path("fixture_c_1p.pdf");
     let out = dir.path().join("selectable.pdf");
 
-    let orig_doc = Document::load(&src).unwrap();
+    let orig_doc = load_pdf(&src, &LoadOptions::none()).unwrap().doc;
     let orig_text = orig_doc.extract_text(&[1]).unwrap();
 
     let mut doc = orig_doc;
@@ -634,7 +634,7 @@ fn test_overlay_audit_10_text_remains_selectable() {
     .unwrap();
     doc.save(&out).unwrap();
 
-    let reloaded = Document::load(&out).unwrap();
+    let reloaded = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let new_text = reloaded.extract_text(&[1]).unwrap();
     assert!(new_text.contains(orig_text.trim()));
     assert!(new_text.contains("SELECTABLE-OVERLAY-TEXT"));
@@ -659,7 +659,7 @@ fn test_number_placeholders_and_subset_pages() {
     assert_eq!(report.pages_numbered, vec![2, 3]);
     assert_eq!(report.total_pages, 3);
 
-    let doc = Document::load(&out).unwrap();
+    let doc = load_pdf(&out, &LoadOptions::none()).unwrap().doc;
     let p1_text = doc.extract_text(&[1]).unwrap();
     let p2_text = doc.extract_text(&[2]).unwrap();
     let p3_text = doc.extract_text(&[3]).unwrap();

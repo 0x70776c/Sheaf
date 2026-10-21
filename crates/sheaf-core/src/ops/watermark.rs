@@ -164,6 +164,9 @@ pub struct WatermarkReport {
     pub pages_watermarked: Vec<u32>,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Parses a `#RRGGBB` hex string or named color (`gray`, `red`, `blue`, `black`) into normalized RGB `(r, g, b)` in `0.0..=1.0` and a canonical `#RRGGBB` string.
@@ -247,6 +250,7 @@ pub fn watermark(
 
     let raw_bytes = fs::read(src)?;
     let loaded = load_pdf_from_bytes(&raw_bytes, src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
     let mut doc = loaded.doc;
 
     let pages_map = doc.get_pages();
@@ -317,5 +321,6 @@ pub fn watermark(
         total_pages,
         pages_watermarked: target_pages,
         dry_run: opts.dry_run,
+        was_encrypted,
     })
 }

@@ -136,3 +136,70 @@ fn decrypt_doc(
         was_encrypted: true,
     })
 }
+
+/// Inspects the PDF trailer / dictionary to extract encryption metadata if present.
+#[allow(clippy::disallowed_methods)]
+pub fn extract_encryption_info(
+    raw_bytes: &[u8],
+    doc: Option<&Document>,
+) -> Option<crate::ops::info::EncryptionInfo> {
+    if let Some(d) = doc
+        && let Some(info) = parse_encryption_from_doc(d)
+    {
+        return Some(info);
+    }
+
+    let lopdf_opts = LopdfLoadOptions::default();
+    if let Ok(raw_doc) = Document::load_mem_with_options(raw_bytes, lopdf_opts)
+        && let Some(info) = parse_encryption_from_doc(&raw_doc)
+    {
+        return Some(info);
+    }
+
+    None
+}
+
+fn parse_encryption_from_doc(doc: &Document) -> Option<crate::ops::info::EncryptionInfo> {
+    let enc_obj = doc.trailer.get(b"Encrypt").ok()?;
+    let dict = match enc_obj {
+        lopdf::Object::Reference(id) => doc
+            .get_object(*id)
+            .ok()
+            .and_then(|obj| obj.as_dict().ok())?,
+        lopdf::Object::Dictionary(d) => d,
+        _ => return None,
+    };
+
+    let v = dict.get(b"V").and_then(lopdf::Object::as_i64).unwrap_or(0);
+    let revision = dict.get(b"R").and_then(lopdf::Object::as_i64).unwrap_or(0);
+    let p_val = dict.get(b"P").and_then(lopdf::Object::as_i64).unwrap_or(0);
+    let length = dict.get(b"Length").and_then(lopdf::Object::as_i64);
+
+    let p = p_val as i32;
+    let print = (p & (1 << 2)) != 0;
+    let modify = (p & (1 << 3)) != 0;
+    let copy = (p & (1 << 4)) != 0;
+    let permissions = crate::ops::info::EncryptionPermissionsInfo {
+        print,
+        copy,
+        modify,
+    };
+
+    let (algorithm, key_bits) = if revision >= 5 || v == 5 {
+        ("aes-256".to_string(), 256)
+    } else if revision == 4 || v == 4 {
+        ("aes-128".to_string(), 128)
+    } else if v == 2 || revision == 3 {
+        let bits = length.unwrap_or(128) as u32;
+        ("rc4".to_string(), bits)
+    } else {
+        ("rc4".to_string(), 40)
+    };
+
+    Some(crate::ops::info::EncryptionInfo {
+        algorithm,
+        key_bits,
+        revision,
+        permissions,
+    })
+}

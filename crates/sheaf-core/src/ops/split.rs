@@ -233,6 +233,9 @@ pub struct SplitReport {
     /// Non-fatal warnings produced during splitting (e.g. skipped bookmarks without valid target).
     #[serde(skip)]
     pub warnings: Vec<String>,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 struct PlannedOutput {
@@ -281,6 +284,7 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
     }
 
     let loaded = load_pdf(src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
     let doc = loaded.doc;
 
     let pages_map = doc.get_pages();
@@ -323,6 +327,7 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
             mode: opts.mode.as_str(),
             outputs: planned.into_iter().map(|item| item.output).collect(),
             warnings,
+            was_encrypted,
         });
     }
 
@@ -348,6 +353,7 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
         mode: opts.mode.as_str(),
         outputs,
         warnings,
+        was_encrypted,
     })
 }
 

@@ -6,7 +6,7 @@ use lopdf::Document;
 use sheaf_core::{
     ConvertPageSize, ImageFormat, ImagesToPdfOptions, LoadOptions, MarkdownToPdfOptions,
     NoProgress, PdfToImagesOptions, PdfToMarkdownOptions, Progress, SheafError, images_to_pdf,
-    markdown_to_pdf, pdf_to_images, pdf_to_markdown,
+    load_pdf, markdown_to_pdf, pdf_to_images, pdf_to_markdown,
 };
 
 struct CancelledProgress;
@@ -29,7 +29,9 @@ fn fixtures_dir() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]

@@ -31,6 +31,9 @@ pub struct MergeReport {
     pub output: PathBuf,
     /// Total number of pages in the merged PDF.
     pub pages_total: u32,
+    /// Whether any input file was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Merges multiple PDF files into a single output PDF file (overwriting `out` if it exists,
@@ -108,6 +111,7 @@ pub fn merge_with_options(
     let mut documents_pages: Vec<(ObjectId, Object)> = Vec::new();
     let mut documents_objects: BTreeMap<ObjectId, Object> = BTreeMap::new();
     let mut merged_doc = Document::with_version("1.5");
+    let mut any_was_encrypted = false;
 
     for (idx, path) in inputs.iter().enumerate() {
         if p.is_cancelled() {
@@ -115,6 +119,7 @@ pub fn merge_with_options(
         }
 
         let loaded = load_pdf(path, &opts.load)?;
+        any_was_encrypted |= loaded.was_encrypted;
         let mut doc = loaded.doc;
 
         doc.renumber_objects_with(max_id);
@@ -154,6 +159,7 @@ pub fn merge_with_options(
             inputs: inputs.to_vec(),
             output: out.to_path_buf(),
             pages_total,
+            was_encrypted: any_was_encrypted,
         });
     }
 
@@ -258,6 +264,7 @@ pub fn merge_with_options(
         inputs: inputs.to_vec(),
         output: out.to_path_buf(),
         pages_total,
+        was_encrypted: any_was_encrypted,
     })
 }
 

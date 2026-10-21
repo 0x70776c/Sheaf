@@ -29,6 +29,10 @@ impl Command for CompressArgs {
 
         let report = compress_with_options(&self.input, &opts, &ctx.progress)?;
         let mut warnings = resolver.warnings;
+        if report.was_encrypted {
+            warnings
+                .push("Eingabe war verschlüsselt, Ausgabe ist nicht verschlüsselt.".to_string());
+        }
         if report.already_optimal {
             warnings.push(
                 "File is already optimal (compressed output was not smaller than original)."

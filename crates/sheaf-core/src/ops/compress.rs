@@ -135,6 +135,9 @@ pub struct CompressReport {
     pub already_optimal: bool,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Compresses a PDF file (`src`) using `preset` and writes the result to `out`.
@@ -220,6 +223,7 @@ pub fn compress_with_options(
     p.report(0, 4);
 
     let loaded = load_pdf_from_bytes(&original_bytes, src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
     let mut doc = loaded.doc;
 
     if doc.get_pages().is_empty() {
@@ -298,6 +302,7 @@ pub fn compress_with_options(
         objects_deduped,
         already_optimal,
         dry_run: opts.dry_run,
+        was_encrypted,
     })
 }
 

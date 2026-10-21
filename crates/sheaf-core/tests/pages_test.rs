@@ -4,7 +4,7 @@ use std::process::Command;
 use lopdf::Document;
 use sheaf_core::{
     LoadOptions, NoProgress, PageOpOptions, PageSelection, SheafError, delete_pages, extract_pages,
-    get_effective_page_rotation, normalize_rotation_degrees, reorder_pages, rotate_pages,
+    get_effective_page_rotation, load_pdf, normalize_rotation_degrees, reorder_pages, rotate_pages,
 };
 
 fn fixtures_dir() -> PathBuf {
@@ -18,7 +18,9 @@ fn fixtures_dir() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]

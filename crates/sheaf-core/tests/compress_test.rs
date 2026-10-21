@@ -10,7 +10,7 @@ use lopdf::{
 };
 use sheaf_core::{
     CompressOptions, CompressPreset, LoadOptions, NoProgress, Progress, SheafError, compress,
-    compress_with_options,
+    compress_with_options, load_pdf,
 };
 
 struct CancelledProgress;
@@ -33,7 +33,9 @@ fn fixtures_dir() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]
@@ -69,8 +71,8 @@ fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
 fn ensure_photo_fixture() -> PathBuf {
     let path = fixtures_dir().join("fixture_photo.pdf");
     if path.exists()
-        && let Ok(doc) = Document::load(&path)
-        && doc.get_pages().len() == 2
+        && let Ok(loaded) = load_pdf(&path, &LoadOptions::none())
+        && loaded.doc.get_pages().len() == 2
     {
         return path;
     }

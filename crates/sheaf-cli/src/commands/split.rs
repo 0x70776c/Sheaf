@@ -66,6 +66,10 @@ impl Command for SplitArgs {
         let mut report = split(&self.input, &opts, &ctx.progress)?;
         let mut warnings = std::mem::take(&mut report.warnings);
         warnings.extend(resolver.warnings);
+        if report.was_encrypted {
+            warnings
+                .push("Eingabe war verschlüsselt, Ausgabe ist nicht verschlüsselt.".to_string());
+        }
 
         Ok(Outcome {
             report,

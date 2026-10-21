@@ -187,6 +187,9 @@ pub struct PdfToImagesReport {
     pub outputs: Vec<ConvertedImagePage>,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Options for [`images_to_pdf`].
@@ -219,6 +222,9 @@ pub struct ImagesToPdfReport {
     pub pages: u32,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Options for [`pdf_to_markdown`].
@@ -253,6 +259,9 @@ pub struct PdfToMarkdownReport {
     pub line_count: usize,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Options for [`markdown_to_pdf`].
@@ -299,6 +308,9 @@ pub struct MarkdownToPdfReport {
     pub headings_count: u32,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Unified report enum covering all conversion directions (`to-images`, `from-images`, `to-markdown`, `from-markdown`).
@@ -313,6 +325,18 @@ pub enum ConvertReport {
     ToMarkdown(PdfToMarkdownReport),
     /// Report from [`markdown_to_pdf`].
     FromMarkdown(MarkdownToPdfReport),
+}
+
+impl ConvertReport {
+    /// Returns `true` if the input PDF was originally encrypted.
+    pub fn was_encrypted(&self) -> bool {
+        match self {
+            Self::ToImages(r) => r.was_encrypted,
+            Self::ToMarkdown(r) => r.was_encrypted,
+            Self::FromImages(r) => r.was_encrypted,
+            Self::FromMarkdown(r) => r.was_encrypted,
+        }
+    }
 }
 
 /// Exports pages of a PDF (`src`) as `PNG` or `JPG` images into a directory.
@@ -365,7 +389,7 @@ pub fn pdf_to_images(
     ensure_not_overwriting_inputs(&[src.to_path_buf()], &out_dir)?;
 
     let pdfium = get_pdfium()?;
-    let doc = load_pdfium_doc(pdfium, src, &opts.load)?;
+    let (doc, was_encrypted) = load_pdfium_doc(pdfium, src, &opts.load)?;
     let total_pages = u32::try_from(doc.pages().len()).unwrap_or(0);
     if total_pages == 0 {
         return Err(SheafError::InvalidPdf(format!(
@@ -474,6 +498,7 @@ pub fn pdf_to_images(
         total_pages,
         outputs,
         dry_run: opts.dry_run,
+        was_encrypted,
     })
 }
 
@@ -650,6 +675,7 @@ pub fn images_to_pdf<P: AsRef<Path>>(
         margin_pt: opts.margin_pt,
         pages: pages_count,
         dry_run: opts.dry_run,
+        was_encrypted: false,
     })
 }
 
@@ -698,6 +724,7 @@ pub fn pdf_to_markdown(
 
     let raw_bytes = fs::read(src)?;
     let loaded = load_pdf_from_bytes(&raw_bytes, src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
     let doc = loaded.doc;
 
     let pages_map = doc.get_pages();
@@ -784,6 +811,7 @@ pub fn pdf_to_markdown(
         char_count,
         line_count,
         dry_run: opts.dry_run,
+        was_encrypted,
     })
 }
 
@@ -876,6 +904,7 @@ pub fn markdown_to_pdf(
         pages: pages_count,
         headings_count,
         dry_run: opts.dry_run,
+        was_encrypted: false,
     })
 }
 
@@ -883,12 +912,14 @@ fn load_pdfium_doc<'a>(
     pdfium: &'a Pdfium,
     src: &Path,
     load_opts: &LoadOptions,
-) -> Result<PdfDocument<'a>, SheafError> {
+) -> Result<(PdfDocument<'a>, bool), SheafError> {
     let pw_str = load_opts.password.as_ref().map(|s| s.expose_secret());
+    let loaded_probe = load_pdf(src, load_opts)?;
+    let was_encrypted = loaded_probe.was_encrypted;
+
     match pdfium.load_pdf_from_file(src, pw_str) {
-        Ok(doc) => Ok(doc),
+        Ok(doc) => Ok((doc, was_encrypted)),
         Err(err) => {
-            load_pdf(src, load_opts)?;
             let err_str = err.to_string();
             if err_str.to_ascii_lowercase().contains("password")
                 || err_str.to_ascii_lowercase().contains("encrypt")

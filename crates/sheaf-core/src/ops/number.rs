@@ -160,6 +160,9 @@ pub struct NumberReport {
     pub pages_numbered: Vec<u32>,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Expands a page-number template containing `{n}`, `{total}`, `{page}`, and `{pages}`.
@@ -317,6 +320,7 @@ pub fn number(
 
     let raw_bytes = fs::read(src)?;
     let loaded = load_pdf_from_bytes(&raw_bytes, src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
     let mut doc = loaded.doc;
 
     let pages_map = doc.get_pages();
@@ -387,5 +391,6 @@ pub fn number(
         total_pages,
         pages_numbered: target_pages,
         dry_run: opts.dry_run,
+        was_encrypted,
     })
 }

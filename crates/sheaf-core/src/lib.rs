@@ -28,7 +28,10 @@ pub use ops::convert::{
     PdfToImagesReport, PdfToMarkdownOptions, PdfToMarkdownReport, images_to_pdf, markdown_to_pdf,
     pdf_to_images, pdf_to_markdown,
 };
-pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info, info_with_options};
+pub use ops::info::{
+    EncryptionInfo, EncryptionPermissionsInfo, FileInfo, InfoReport, PdfMetadataInfo, info,
+    info_with_options,
+};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
 pub use ops::number::{NumberOptions, NumberPosition, NumberReport, format_page_number, number};
 pub use ops::overlay::{

@@ -7,7 +7,7 @@ use lopdf::content::{Content, Operation};
 use lopdf::{
     Bookmark, Document, EncryptionState, EncryptionVersion, Object, Permissions, Stream, dictionary,
 };
-use sheaf_core::{NoProgress, Progress, SheafError, merge};
+use sheaf_core::{LoadOptions, NoProgress, Progress, SheafError, load_pdf, merge};
 
 static INIT_FIXTURES: Once = Once::new();
 
@@ -172,7 +172,9 @@ fn validate_output_pdf(path: &Path, expected_pages: usize) -> Document {
         "Output PDF does not exist: {}",
         path.display()
     );
-    let doc = Document::load(path).expect("Output PDF should load cleanly with lopdf");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("Output PDF should load cleanly with lopdf")
+        .doc;
     assert_eq!(
         doc.get_pages().len(),
         expected_pages,

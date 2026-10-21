@@ -25,6 +25,30 @@ pub struct PdfMetadataInfo {
     pub producer: Option<String>,
 }
 
+/// Permissions decoded from the PDF encryption dictionary (`/P`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EncryptionPermissionsInfo {
+    /// Whether printing is permitted.
+    pub print: bool,
+    /// Whether text and graphics copying/extraction is permitted.
+    pub copy: bool,
+    /// Whether modifying contents, annotations, and forms is permitted.
+    pub modify: bool,
+}
+
+/// Details about the PDF document encryption.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EncryptionInfo {
+    /// Encryption algorithm (`"aes-128"`, `"aes-256"`, or `"rc4"`).
+    pub algorithm: String,
+    /// Encryption key length in bits (e.g. 128 or 256).
+    pub key_bits: u32,
+    /// Encryption revision number (e.g. 4, 5, or 6).
+    pub revision: i64,
+    /// Decoded permission flags.
+    pub permissions: EncryptionPermissionsInfo,
+}
+
 /// Information about a single PDF file.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FileInfo {
@@ -34,10 +58,12 @@ pub struct FileInfo {
     pub size_bytes: u64,
     /// PDF specification version (e.g. `"1.5"`).
     pub pdf_version: String,
-    /// Number of pages (`None` when the file is encrypted).
+    /// Number of pages (`None` when the file is encrypted and unreadable).
     pub pages: Option<u32>,
     /// Whether the file is encrypted / password-protected.
     pub encrypted: bool,
+    /// Encryption details (`None` when unencrypted).
+    pub encryption: Option<EncryptionInfo>,
     /// Document metadata (`None` when encrypted or when no Info dictionary is present).
     pub metadata: Option<PdfMetadataInfo>,
     /// Whether the document has bookmarks / outlines.
@@ -109,6 +135,7 @@ pub fn info_with_options(
 fn inspect_single_file(path: &Path, load_opts: &LoadOptions) -> Result<FileInfo, SheafError> {
     let fs_meta = std::fs::metadata(path)?;
     let size_bytes = fs_meta.len();
+    let raw_bytes = std::fs::read(path)?;
 
     let loaded = load_pdf(path, load_opts);
 
@@ -116,12 +143,14 @@ fn inspect_single_file(path: &Path, load_opts: &LoadOptions) -> Result<FileInfo,
         Ok(l) => (l.doc, l.was_encrypted),
         Err(SheafError::Encrypted | SheafError::WrongPassword) => {
             let version = read_header_version(path).unwrap_or_else(|| "1.4".to_string());
+            let encryption = crate::load::extract_encryption_info(&raw_bytes, None);
             return Ok(FileInfo {
                 path: path.to_path_buf(),
                 size_bytes,
                 pdf_version: version,
                 pages: None,
                 encrypted: true,
+                encryption,
                 metadata: None,
                 has_outlines: false,
                 outline_count: 0,
@@ -131,6 +160,12 @@ fn inspect_single_file(path: &Path, load_opts: &LoadOptions) -> Result<FileInfo,
         Err(e) => return Err(e),
     };
 
+    let encryption = if was_encrypted {
+        crate::load::extract_encryption_info(&raw_bytes, Some(&doc))
+    } else {
+        None
+    };
+
     if was_encrypted && doc.is_encrypted() {
         return Ok(FileInfo {
             path: path.to_path_buf(),
@@ -138,6 +173,7 @@ fn inspect_single_file(path: &Path, load_opts: &LoadOptions) -> Result<FileInfo,
             pdf_version: doc.version.clone(),
             pages: None,
             encrypted: true,
+            encryption,
             metadata: None,
             has_outlines: false,
             outline_count: 0,
@@ -171,7 +207,8 @@ fn inspect_single_file(path: &Path, load_opts: &LoadOptions) -> Result<FileInfo,
         size_bytes,
         pdf_version: doc.version.clone(),
         pages: Some(page_count),
-        encrypted: false,
+        encrypted: was_encrypted,
+        encryption,
         metadata,
         has_outlines,
         outline_count,

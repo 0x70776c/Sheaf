@@ -70,9 +70,15 @@ impl Command for ConvertArgs {
             }
         };
 
+        let mut warnings = Vec::new();
+        if report.was_encrypted() {
+            warnings
+                .push("Eingabe war verschlüsselt, Ausgabe ist nicht verschlüsselt.".to_string());
+        }
+
         Ok(Outcome {
             report,
-            warnings: Vec::new(),
+            warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })

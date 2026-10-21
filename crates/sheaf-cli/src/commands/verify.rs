@@ -25,6 +25,18 @@ impl Command for VerifyArgs {
 
         let failure = if report.all_valid() {
             None
+        } else if report.files.iter().any(|f| {
+            f.problems
+                .iter()
+                .any(|p| p.starts_with("encrypted:") || p.contains("encrypted (password required)"))
+        }) {
+            Some(SheafError::Encrypted)
+        } else if report.files.iter().any(|f| {
+            f.problems
+                .iter()
+                .any(|p| p.starts_with("wrong_password:") || p.contains("Incorrect password"))
+        }) {
+            Some(SheafError::WrongPassword)
         } else {
             Some(SheafError::InvalidPdf(
                 "At least one PDF file failed verification.".to_string(),

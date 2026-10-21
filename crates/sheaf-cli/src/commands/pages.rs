@@ -108,6 +108,12 @@ impl Command for PagesArgs {
             }
         };
 
+        let mut warnings = warnings;
+        if report.was_encrypted {
+            warnings
+                .push("Eingabe war verschlüsselt, Ausgabe ist nicht verschlüsselt.".to_string());
+        }
+
         Ok(Outcome {
             report,
             warnings,
