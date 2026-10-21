@@ -59,11 +59,17 @@ npm run check
 npm run build
 ```
 
-### Desktop UI Shell (`apps/desktop`)
+### Desktop Application (`apps/desktop`)
 - **Minimalist macOS Design:** Transparent overlay titlebar, 220 px vibrancy sidebar with Lucide icons (`stroke-width: 1.5`), warm light (`#FAFAF9`) and native dark (`#161617`) color tokens, and 4 px grid spacing.
+- **Interactive Thumbnail Grid & Progressive Disclosure:**
+  - Lazy-loaded PDFium page thumbnails with skeleton placeholders and bi-directional page range synchronization.
+  - Multi-page selection via single click, `⇧+Click` (range), `⌘+Click` (toggle), and `⌘A` (select/deselect all).
+  - Dedicated right-hand options panels for **Merge** (queue reordering, add/remove files), **Split** (*Ranges* with *Combine* toggle, *Every N*, *Bookmarks*), **Pages** (*Rotate* 90°/180°/270°, *Delete*, *Reorder*, *Extract*), and **Info**.
+  - Real-time progress bar with cancellation (`Cancel`) and completion toast with **Show in Finder** (`open -R`) and **Open** actions.
 - **Keyboard-First Workflow:**
   - `⌘K`: Open Command Palette to switch tools, open files, or toggle theme (`System` / `Light` / `Dark`)
   - `⌘O`: Open PDF file dialog
+  - `⌘A`: Select or deselect all pages in the thumbnail grid
   - `⌘1`–`⌘8`: Jump directly to *Merge*, *Split*, *Pages*, *Compress*, *Convert*, *Watermark*, *Protect*, or *Info*
   - `↑` / `↓` / `Enter` / `Esc`: Full keyboard navigation across the sidebar, drop-zone, and command palette.
 

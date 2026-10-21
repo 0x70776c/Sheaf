@@ -10,6 +10,9 @@ export type ToolId =
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+export type SplitModeUi = 'ranges' | 'every' | 'bookmarks';
+export type PagesActionUi = 'rotate' | 'delete' | 'reorder' | 'extract';
+
 export interface PdfMetadataInfo {
   title: string | null;
   author: string | null;
@@ -33,6 +36,36 @@ export interface InfoReport {
   files: FileInfo[];
 }
 
+export interface MergeReport {
+  inputs: string[];
+  output: string;
+  pages_total: number;
+}
+
+export interface SplitOutput {
+  path: string;
+  pages: number;
+  page_range: [number, number] | null;
+  title: string | null;
+}
+
+export interface SplitReport {
+  input: string;
+  input_pages: number;
+  mode: string;
+  outputs: SplitOutput[];
+}
+
+export interface PagesReport {
+  action: string;
+  input: string;
+  output: string;
+  input_pages: number;
+  output_pages: number;
+  pages_affected: number[];
+  degrees?: number | null;
+}
+
 export interface ThumbnailItem {
   page: number;
   width_px: number;
@@ -50,4 +83,10 @@ export interface CommandErrorPayload {
   code: string;
   message: string;
   hint: string | null;
+}
+
+export interface ToastNotice {
+  title: string;
+  subtitle: string;
+  targetPath: string;
 }
