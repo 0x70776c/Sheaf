@@ -1,0 +1,73 @@
+---
+source: crates/sheaf-cli/tests/cli_milestone2_test.rs
+expression: cap_val
+---
+{
+  "data": {
+    "commands": [
+      {
+        "args": [
+          "inputs...",
+          "-o"
+        ],
+        "name": "merge",
+        "status": "stable"
+      },
+      {
+        "args": [
+          "input",
+          "--ranges",
+          "--every",
+          "--bookmarks-level",
+          "--combine",
+          "-o"
+        ],
+        "name": "split",
+        "status": "stable"
+      },
+      {
+        "args": [
+          "file..."
+        ],
+        "name": "info",
+        "status": "stable"
+      },
+      {
+        "args": [
+          "file...",
+          "--deep"
+        ],
+        "name": "verify",
+        "status": "stable"
+      },
+      {
+        "args": [],
+        "name": "capabilities",
+        "status": "stable"
+      }
+    ],
+    "exit_codes": {
+      "0": "ok",
+      "1": "internal",
+      "130": "cancelled",
+      "2": "usage",
+      "3": "invalid_pdf",
+      "4": "encrypted",
+      "5": "page_out_of_range",
+      "6": "io",
+      "7": "output_exists",
+      "8": "unsupported"
+    },
+    "schema": 1,
+    "tools": {
+      "qpdf": true
+    },
+    "version": "0.1.0"
+  },
+  "dry_run": false,
+  "duration_ms": "[duration_ms]",
+  "ok": true,
+  "op": "capabilities",
+  "schema": 1,
+  "warnings": []
+}

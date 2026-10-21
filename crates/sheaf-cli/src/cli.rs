@@ -125,7 +125,7 @@ pub struct SplitArgs {
     pub bookmarks_level: Option<u8>,
 
     /// Ausgewählte Seitenbereiche in einer einzigen Datei zusammenfassen (nur mit --ranges)
-    #[arg(long, requires = "ranges")]
+    #[arg(long, requires = "ranges", conflicts_with_all = ["every", "bookmarks_level"])]
     pub combine: bool,
 
     /// Zielverzeichnis für die erzeugten PDF-Dateien (Standard: Ordner der Eingabedatei)

@@ -1,0 +1,46 @@
+---
+source: crates/sheaf-cli/tests/cli_milestone2_test.rs
+expression: split_val
+---
+{
+  "data": {
+    "input": "report.pdf",
+    "input_pages": 12,
+    "mode": "ranges",
+    "outputs": [
+      {
+        "page_range": [
+          1,
+          3
+        ],
+        "pages": 3,
+        "path": "out/report_p1-3.pdf",
+        "title": null
+      },
+      {
+        "page_range": [
+          5,
+          5
+        ],
+        "pages": 1,
+        "path": "out/report_p5.pdf",
+        "title": null
+      },
+      {
+        "page_range": [
+          8,
+          12
+        ],
+        "pages": 5,
+        "path": "out/report_p8-12.pdf",
+        "title": null
+      }
+    ]
+  },
+  "dry_run": false,
+  "duration_ms": "[duration_ms]",
+  "ok": true,
+  "op": "split",
+  "schema": 1,
+  "warnings": []
+}

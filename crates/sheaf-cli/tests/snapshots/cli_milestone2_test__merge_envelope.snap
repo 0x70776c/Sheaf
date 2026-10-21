@@ -1,0 +1,20 @@
+---
+source: crates/sheaf-cli/tests/cli_milestone2_test.rs
+expression: merge_val
+---
+{
+  "data": {
+    "inputs": [
+      "out/report_p1-3.pdf",
+      "out/report_p5.pdf"
+    ],
+    "output": "merged.pdf",
+    "pages_total": 4
+  },
+  "dry_run": false,
+  "duration_ms": "[duration_ms]",
+  "ok": true,
+  "op": "merge",
+  "schema": 1,
+  "warnings": []
+}

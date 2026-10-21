@@ -1,0 +1,37 @@
+---
+source: crates/sheaf-cli/tests/cli_milestone2_test.rs
+expression: info_val
+---
+{
+  "data": {
+    "files": [
+      {
+        "encrypted": false,
+        "first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "has_outlines": false,
+        "metadata": {
+          "author": "Sheaf Test",
+          "creator": null,
+          "keywords": null,
+          "producer": null,
+          "subject": null,
+          "title": "Report12"
+        },
+        "outline_count": 0,
+        "pages": 12,
+        "path": "report.pdf",
+        "pdf_version": "1.5",
+        "size_bytes": "[size_bytes]"
+      }
+    ]
+  },
+  "dry_run": false,
+  "duration_ms": "[duration_ms]",
+  "ok": true,
+  "op": "info",
+  "schema": 1,
+  "warnings": []
+}

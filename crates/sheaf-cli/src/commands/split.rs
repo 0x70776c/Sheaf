@@ -14,6 +14,11 @@ impl Command for SplitArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
+        if self.combine && self.ranges.is_none() {
+            return Err(SheafError::InvalidSelection(
+                "'--combine' kann nur zusammen mit '--ranges' verwendet werden.".to_string(),
+            ));
+        }
         let mode = if let Some(ref ranges_str) = self.ranges {
             // Inspect input page count first so PageSelection::parse can resolve open ranges (`8-`)
             // and report accurate PageOutOfRange / InvalidSelection errors.

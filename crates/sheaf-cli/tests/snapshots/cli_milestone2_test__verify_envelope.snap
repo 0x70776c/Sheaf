@@ -1,0 +1,22 @@
+---
+source: crates/sheaf-cli/tests/cli_milestone2_test.rs
+expression: verify_val
+---
+{
+  "data": {
+    "files": [
+      {
+        "pages": 4,
+        "path": "merged.pdf",
+        "problems": [],
+        "valid": true
+      }
+    ]
+  },
+  "dry_run": false,
+  "duration_ms": "[duration_ms]",
+  "ok": true,
+  "op": "verify",
+  "schema": 1,
+  "warnings": []
+}
