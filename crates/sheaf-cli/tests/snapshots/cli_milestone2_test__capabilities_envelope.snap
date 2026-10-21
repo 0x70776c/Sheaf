@@ -1,6 +1,5 @@
 ---
 source: crates/sheaf-cli/tests/cli_milestone2_test.rs
-assertion_line: 520
 expression: cap_val
 ---
 {
@@ -8,121 +7,360 @@ expression: cap_val
     "commands": [
       {
         "args": [
-          "inputs...",
-          "-o"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUTS"
+          },
+          {
+            "long": "out",
+            "required": true,
+            "secret": false,
+            "value_name": "OUT"
+          }
         ],
         "name": "merge",
         "status": "stable"
       },
       {
         "args": [
-          "input",
-          "--ranges",
-          "--every",
-          "--bookmarks-level",
-          "--combine",
-          "-o"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "long": "ranges",
+            "required": false,
+            "secret": false,
+            "value_name": "RANGES"
+          },
+          {
+            "long": "every",
+            "required": false,
+            "secret": false,
+            "value_name": "EVERY"
+          },
+          {
+            "long": "bookmarks-level",
+            "required": false,
+            "secret": false,
+            "value_name": "BOOKMARKS_LEVEL"
+          },
+          {
+            "long": "combine",
+            "required": false,
+            "secret": false,
+            "value_name": "COMBINE"
+          },
+          {
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          }
         ],
         "name": "split",
         "status": "stable"
       },
       {
-        "args": [
-          "rotate|delete|reorder|extract",
-          "input",
-          "--pages",
-          "--order",
-          "--degrees",
-          "-o"
-        ],
+        "args": [],
         "name": "pages",
         "status": "stable"
       },
       {
         "args": [
-          "input",
-          "--page",
-          "--pages",
-          "--dpi",
-          "--width",
-          "--no-cache",
-          "-o"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "long": "page",
+            "required": false,
+            "secret": false,
+            "value_name": "PAGE"
+          },
+          {
+            "long": "pages",
+            "required": false,
+            "secret": false,
+            "value_name": "PAGES"
+          },
+          {
+            "long": "dpi",
+            "required": false,
+            "secret": false,
+            "value_name": "DPI"
+          },
+          {
+            "long": "width",
+            "required": false,
+            "secret": false,
+            "value_name": "WIDTH"
+          },
+          {
+            "long": "no-cache",
+            "required": false,
+            "secret": false,
+            "value_name": "NO_CACHE"
+          },
+          {
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          }
         ],
         "name": "render",
         "status": "stable"
       },
       {
         "args": [
-          "input",
-          "--preset",
-          "--grayscale",
-          "-o"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "long": "preset",
+            "required": false,
+            "secret": false,
+            "value_name": "PRESET"
+          },
+          {
+            "long": "grayscale",
+            "required": false,
+            "secret": false,
+            "value_name": "GRAYSCALE"
+          },
+          {
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          }
         ],
         "name": "compress",
         "status": "stable"
       },
       {
-        "args": [
-          "to-images|from-images|to-markdown|from-markdown",
-          "input",
-          "--format",
-          "--dpi",
-          "--quality",
-          "--pages",
-          "--page-size",
-          "--margin",
-          "-o"
-        ],
+        "args": [],
         "name": "convert",
         "status": "stable"
       },
       {
         "args": [
-          "input",
-          "--text",
-          "--position",
-          "--font-size",
-          "--opacity",
-          "--rotation",
-          "--color",
-          "--pages",
-          "-o"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "long": "text",
+            "required": true,
+            "secret": false,
+            "value_name": "TEXT"
+          },
+          {
+            "long": "position",
+            "required": false,
+            "secret": false,
+            "value_name": "POSITION"
+          },
+          {
+            "long": "font-size",
+            "required": false,
+            "secret": false,
+            "value_name": "FONT_SIZE"
+          },
+          {
+            "long": "opacity",
+            "required": false,
+            "secret": false,
+            "value_name": "OPACITY"
+          },
+          {
+            "long": "rotation",
+            "required": false,
+            "secret": false,
+            "value_name": "ROTATION"
+          },
+          {
+            "long": "color",
+            "required": false,
+            "secret": false,
+            "value_name": "COLOR"
+          },
+          {
+            "long": "pages",
+            "required": false,
+            "secret": false,
+            "value_name": "PAGES"
+          },
+          {
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          }
         ],
         "name": "watermark",
         "status": "stable"
       },
       {
         "args": [
-          "input",
-          "--password",
-          "--owner-password",
-          "--no-print",
-          "--no-copy",
-          "-o"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "long": "format",
+            "required": false,
+            "secret": false,
+            "value_name": "FORMAT"
+          },
+          {
+            "long": "position",
+            "required": false,
+            "secret": false,
+            "value_name": "POSITION"
+          },
+          {
+            "long": "start",
+            "required": false,
+            "secret": false,
+            "value_name": "START"
+          },
+          {
+            "long": "font-size",
+            "required": false,
+            "secret": false,
+            "value_name": "FONT_SIZE"
+          },
+          {
+            "long": "opacity",
+            "required": false,
+            "secret": false,
+            "value_name": "OPACITY"
+          },
+          {
+            "long": "color",
+            "required": false,
+            "secret": false,
+            "value_name": "COLOR"
+          },
+          {
+            "long": "margin",
+            "required": false,
+            "secret": false,
+            "value_name": "MARGIN"
+          },
+          {
+            "long": "pages",
+            "required": false,
+            "secret": false,
+            "value_name": "PAGES"
+          },
+          {
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          }
+        ],
+        "name": "number",
+        "status": "stable"
+      },
+      {
+        "args": [
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "long": "password",
+            "required": true,
+            "secret": true,
+            "value_name": "PASSWORD"
+          },
+          {
+            "long": "owner-password",
+            "required": false,
+            "secret": true,
+            "value_name": "OWNER_PASSWORD"
+          },
+          {
+            "long": "no-print",
+            "required": false,
+            "secret": false,
+            "value_name": "NO_PRINT"
+          },
+          {
+            "long": "no-copy",
+            "required": false,
+            "secret": false,
+            "value_name": "NO_COPY"
+          },
+          {
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          }
         ],
         "name": "protect",
         "status": "stable"
       },
       {
         "args": [
-          "input",
-          "--password",
-          "-o"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "long": "password",
+            "required": true,
+            "secret": true,
+            "value_name": "PASSWORD"
+          },
+          {
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          }
         ],
         "name": "unlock",
         "status": "stable"
       },
       {
         "args": [
-          "file..."
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "FILES"
+          }
         ],
         "name": "info",
         "status": "stable"
       },
       {
         "args": [
-          "file...",
-          "--deep"
+          {
+            "required": true,
+            "secret": false,
+            "value_name": "FILES"
+          },
+          {
+            "long": "deep",
+            "required": false,
+            "secret": false,
+            "value_name": "DEEP"
+          }
         ],
         "name": "verify",
         "status": "stable"

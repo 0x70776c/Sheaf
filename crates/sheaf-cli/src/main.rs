@@ -99,6 +99,7 @@ fn main() -> ExitCode {
         Commands::Info(args) => execute_command(args, &cli.global, cancelled),
         Commands::Verify(args) => execute_command(args, &cli.global, cancelled),
         Commands::Capabilities(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Docs(args) => execute_command(args, &cli.global, cancelled),
     };
 
     ExitCode::from(code)

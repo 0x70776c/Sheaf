@@ -14,7 +14,9 @@ mod progress;
 pub const SCHEMA_VERSION: u32 = 1;
 
 pub use error::SheafError;
-pub use ops::capabilities::{CapabilitiesReport, capabilities};
+pub use ops::capabilities::{
+    ArgumentCapability, CapabilitiesReport, CommandCapability, capabilities, default_exit_codes,
+};
 pub use ops::compress::{
     CompressOptions, CompressPreset, CompressReport, compress, compress_with_options,
 };

@@ -135,6 +135,10 @@ pub enum Commands {
     /// Describe supported commands, flags, exit codes, and external tools
     #[command(after_help = "Examples:\n  sheaf capabilities --json\n  sheaf capabilities")]
     Capabilities(CapabilitiesArgs),
+
+    /// Generate Markdown documentation for all commands (internal)
+    #[command(hide = true)]
+    Docs(DocsArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -570,3 +574,6 @@ pub struct VerifyArgs {
 
 #[derive(Debug, Clone, Default, Args)]
 pub struct CapabilitiesArgs {}
+
+#[derive(Debug, Clone, Default, Args)]
+pub struct DocsArgs {}
