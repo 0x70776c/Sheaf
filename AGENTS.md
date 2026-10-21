@@ -39,3 +39,19 @@ Io, InvalidPdf, Encrypted, WrongPassword, PageOutOfRange, EmptySelection, Invali
 - Result-/Report-Structs liegen in sheaf-core (derive Serialize), die CLI serialisiert sie nur.
 - Neues Feature = neuer Subcommand + CLI-Integrationstest (assert_cmd) + Eintrag in `sheaf capabilities`.
 
+## Secrets (verschärft)
+- Passwörter nie als CLI-Argument. Nur `--*-password-env`, `--*-password-file`, `--*-password-stdin`.
+- Passwörter nur als `secrecy::SecretString`. Kein `Debug`/`Display`, kein Logging, nicht in JSON, Fehlern oder Snapshots.
+- Höchstens EIN `--*-stdin` pro Aufruf.
+- Entschlüsselte Daten werden nie in Temp-Dateien außerhalb des Zielordners geschrieben und nie im Disk-Cache abgelegt.
+
+## PDF laden
+- Jede Operation lädt PDFs ausschließlich über `sheaf_core::load::load_pdf`.
+- `lopdf::Document::load*` direkt aufrufen ist per `clippy.toml` (`disallowed-methods`) verboten.
+
+## Dokumentation
+- `docs/CLI.md` und `sheaf capabilities` werden aus der clap-Definition generiert, nicht von Hand gepflegt.
+- Der Docs-Sync-Test schlägt fehl, wenn `docs/CLI.md` vom generierten Stand abweicht.
+- Abschlussberichte enthalten rohe Tool-Ausgaben, keine Paraphrasen der CLI.
+
+

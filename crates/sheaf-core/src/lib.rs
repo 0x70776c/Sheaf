@@ -26,6 +26,10 @@ pub use ops::convert::{
 };
 pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
+pub use ops::overlay::{
+    OverlayPosition, PageBox, PageOverlaySpec, apply_overlay_to_page, encode_win_ansi,
+    get_effective_page_box, parse_overlay_color,
+};
 pub use ops::pages::{
     PageOpOptions, PagesReport, delete_pages, extract_pages, get_effective_page_rotation,
     normalize_rotation_degrees, reorder_pages, rotate_pages,
