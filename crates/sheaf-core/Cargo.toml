@@ -8,9 +8,11 @@ description = "Core PDF manipulation engine for Sheaf"
 
 [dependencies]
 lopdf = "0.46.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 thiserror = "2.0.21"
 
 [dev-dependencies]
-insta = "1.49.0"
+insta = { version = "1.49.0", features = ["json", "redactions"] }
 proptest = "1.12.0"
 tempfile = "3.27.0"

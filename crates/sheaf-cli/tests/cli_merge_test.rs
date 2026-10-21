@@ -97,6 +97,7 @@ fn cli_merge_creates_valid_combined_pdf() {
         .arg(&f3)
         .arg("-o")
         .arg(&out)
+        .arg("--force")
         .status()
         .expect("run sheaf merge");
 

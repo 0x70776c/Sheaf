@@ -12,8 +12,14 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
+ctrlc = "3.5.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 sheaf-core = { path = "../sheaf-core" }
 
 [dev-dependencies]
+assert_cmd = "2.2.2"
+insta = { version = "1.49.0", features = ["json", "redactions"] }
 lopdf = "0.46.0"
+predicates = "3.1.4"
 tempfile = "3.27.0"

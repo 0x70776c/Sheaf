@@ -1,44 +1,96 @@
-use std::path::PathBuf;
+mod cli;
+mod commands;
+mod exit;
+mod output;
+mod progress;
+
 use std::process::ExitCode;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Instant;
 
-use clap::{Parser, Subcommand};
-use sheaf_core::{NoProgress, merge};
+use clap::Parser;
 
-#[derive(Debug, Parser)]
-#[command(
-    name = "sheaf",
-    version,
-    about = "Schnelles, 100 % offline arbeitendes PDF-Toolkit für macOS"
-)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
+use crate::cli::{Cli, Commands, GlobalArgs};
+use crate::commands::{Command, Ctx};
+use crate::exit::EXIT_OK;
+use crate::output::{render_clap_error, render_error, render_error_with_data, render_success};
+use crate::progress::CliProgress;
 
-#[derive(Debug, Subcommand)]
-enum Commands {
-    /// Mehrere PDF-Dateien in einer neuen PDF-Datei zusammenführen
-    Merge {
-        /// Eingabe-PDFs in der gewünschten Reihenfolge
-        #[arg(required = true)]
-        inputs: Vec<PathBuf>,
+fn execute_command<C: Command>(cmd: &C, global: &GlobalArgs, cancelled: Arc<AtomicBool>) -> u8 {
+    let op_name = cmd.name();
+    let progress = CliProgress::new(op_name, global.progress, global.quiet, cancelled);
+    let ctx = Ctx {
+        global: global.clone(),
+        progress,
+    };
 
-        /// Ausgabedatei
-        #[arg(short, long)]
-        out: PathBuf,
-    },
+    if global.verbose && !global.quiet {
+        eprintln!(
+            "[debug] Starte Befehl '{op_name}' (dry_run={})",
+            global.dry_run
+        );
+    }
+
+    let start = Instant::now();
+    match cmd.run(&ctx) {
+        Ok(outcome) => {
+            let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
+            let human = cmd.format_human(&outcome.report, outcome.dry_run);
+
+            if let Some(err) = outcome.failure {
+                render_error_with_data(
+                    op_name,
+                    &outcome.report,
+                    &human,
+                    outcome.warnings,
+                    outcome.dry_run,
+                    duration_ms,
+                    &err,
+                    global,
+                    &ctx.progress,
+                )
+            } else {
+                render_success(
+                    op_name,
+                    &outcome.report,
+                    &human,
+                    outcome.warnings,
+                    outcome.dry_run,
+                    duration_ms,
+                    global,
+                    &ctx.progress,
+                );
+                EXIT_OK
+            }
+        }
+        Err(err) => render_error(op_name, &err, global),
+    }
 }
 
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let raw_args: Vec<String> = std::env::args().collect();
 
-    match cli.command {
-        Commands::Merge { inputs, out } => {
-            if let Err(err) = merge(&inputs, &out, &NoProgress) {
-                eprintln!("Fehler: {err}");
-                return ExitCode::FAILURE;
-            }
-            ExitCode::SUCCESS
+    let cli = match Cli::try_parse_from(&raw_args) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            let code = render_clap_error(err, &raw_args);
+            return ExitCode::from(code);
         }
-    }
+    };
+
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let cancel_flag = Arc::clone(&cancelled);
+    let _ = ctrlc::set_handler(move || {
+        cancel_flag.store(true, Ordering::SeqCst);
+    });
+
+    let code = match &cli.command {
+        Commands::Merge(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Info(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Verify(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Capabilities(args) => execute_command(args, &cli.global, cancelled),
+    };
+
+    ExitCode::from(code)
 }

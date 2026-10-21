@@ -4,22 +4,54 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use lopdf::{Bookmark, Dictionary, Document, Object, ObjectId};
+use serde::Serialize;
 
 use crate::error::ensure_not_overwriting_inputs;
+use crate::fs::{check_output_path, write_atomic};
 use crate::{Progress, SheafError};
 
-/// Merges multiple PDF files into a single output PDF file.
+/// Options for merging PDF files.
+#[derive(Debug, Clone)]
+pub struct MergeOptions {
+    /// Overwrite existing output file if `true`.
+    pub force: bool,
+    /// Validate inputs and compute report without writing the output file.
+    pub dry_run: bool,
+}
+
+impl Default for MergeOptions {
+    fn default() -> Self {
+        Self {
+            force: true,
+            dry_run: false,
+        }
+    }
+}
+
+/// Report returned after merging PDF files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct MergeReport {
+    /// Input PDF file paths in merge order.
+    pub inputs: Vec<PathBuf>,
+    /// Output PDF file path.
+    pub output: PathBuf,
+    /// Total number of pages in the merged PDF.
+    pub pages_total: u32,
+}
+
+/// Merges multiple PDF files into a single output PDF file (overwriting `out` if it exists,
+/// unless `out` is one of the input files).
 ///
-/// The page order in `out` follows the order of `inputs`. Existing bookmarks (outlines)
-/// from all input documents are preserved in order, including their hierarchy.
-/// Original input files are never modified.
+/// For fine-grained control over `force` and `dry_run` as well as receiving a [`MergeReport`],
+/// see [`merge_with_options`].
 ///
 /// # Errors
 ///
 /// Returns:
 /// - [`SheafError::EmptySelection`] if `inputs` is empty.
 /// - [`SheafError::Encrypted`] if any input document is password-protected.
-/// - [`SheafError::InvalidPdf`] if an input is not a valid PDF or if `out` matches an input path.
+/// - [`SheafError::InvalidPdf`] if an input is not a valid PDF.
+/// - [`SheafError::InvalidSelection`] if `out` matches an input path.
 /// - [`SheafError::Cancelled`] if `p.is_cancelled()` becomes `true`.
 /// - [`SheafError::Io`] on filesystem read/write errors.
 ///
@@ -33,11 +65,46 @@ use crate::{Progress, SheafError};
 /// merge(&inputs, Path::new("merged.pdf"), &NoProgress).unwrap();
 /// ```
 pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), SheafError> {
+    let opts = MergeOptions {
+        force: true,
+        dry_run: false,
+    };
+    let _report = merge_with_options(inputs, out, &opts, p)?;
+    Ok(())
+}
+
+/// Merges multiple PDF files into `out` according to [`MergeOptions`], returning a [`MergeReport`].
+///
+/// Uses atomic file writing when `opts.dry_run` is `false`.
+///
+/// # Errors
+///
+/// Returns [`SheafError::OutputExists`] if `out` exists and `!opts.force`.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::{Path, PathBuf};
+/// use sheaf_core::ops::merge::{merge_with_options, MergeOptions};
+/// use sheaf_core::NoProgress;
+///
+/// let inputs = vec![PathBuf::from("a.pdf"), PathBuf::from("b.pdf")];
+/// let opts = MergeOptions { force: false, dry_run: true };
+/// let report = merge_with_options(&inputs, Path::new("out.pdf"), &opts, &NoProgress).unwrap();
+/// println!("Total pages: {}", report.pages_total);
+/// ```
+pub fn merge_with_options(
+    inputs: &[PathBuf],
+    out: &Path,
+    opts: &MergeOptions,
+    p: &dyn Progress,
+) -> Result<MergeReport, SheafError> {
     if inputs.is_empty() {
         return Err(SheafError::EmptySelection);
     }
 
     ensure_not_overwriting_inputs(inputs, out)?;
+    check_output_path(out, opts.force)?;
 
     let total_steps = (inputs.len() as u64) + 1;
     p.report(0, total_steps);
@@ -66,11 +133,9 @@ pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), She
             return Err(SheafError::Encrypted);
         }
 
-        // Shift object IDs so they don't collide with previously loaded documents.
         doc.renumber_objects_with(max_id);
         max_id = doc.max_id.saturating_add(1);
 
-        // Preserve bookmarks/outlines from this document after renumbering so page ObjectIds match.
         import_document_bookmarks(&doc, &mut merged_doc);
 
         let pages = doc.get_pages();
@@ -97,6 +162,17 @@ pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), She
         return Err(SheafError::Cancelled);
     }
 
+    let pages_total = u32::try_from(documents_pages.len()).unwrap_or(u32::MAX);
+
+    if opts.dry_run {
+        p.report(total_steps, total_steps);
+        return Ok(MergeReport {
+            inputs: inputs.to_vec(),
+            output: out.to_path_buf(),
+            pages_total,
+        });
+    }
+
     let mut catalog_object: Option<(ObjectId, Dictionary)> = None;
     let mut pages_object: Option<(ObjectId, Dictionary)> = None;
 
@@ -112,8 +188,6 @@ pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), She
             b"Pages" => {
                 if let Ok(dict) = object.as_dict() {
                     if let Some((existing_id, mut existing_dict)) = pages_object.take() {
-                        // Keep initial root Pages dictionary attributes (e.g. inherited MediaBox/Resources)
-                        // while only filling missing keys from subsequent documents.
                         for (k, v) in dict.iter() {
                             if !existing_dict.has(k) {
                                 existing_dict.set(k.clone(), v.clone());
@@ -125,9 +199,7 @@ pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), She
                     }
                 }
             }
-            b"Page" | b"Outlines" | b"Outline" => {
-                // Handled separately when rebuilding the Pages tree and Outlines tree.
-            }
+            b"Page" | b"Outlines" | b"Outline" => {}
             _ => {
                 merged_doc.objects.insert(object_id, object);
             }
@@ -192,28 +264,27 @@ pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), She
         dict.set("Outlines", Object::Reference(outline_id));
     }
 
-    if let Some(parent) = out.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    merged_doc.save(out)?;
+    write_atomic(out, opts.force, |file| {
+        merged_doc.save_to(file)?;
+        Ok(())
+    })?;
 
     p.report(total_steps, total_steps);
-    Ok(())
+    Ok(MergeReport {
+        inputs: inputs.to_vec(),
+        output: out.to_path_buf(),
+        pages_total,
+    })
 }
 
 /// Extracts bookmarks/outlines from `source` and appends them into `target`,
 /// preserving nesting levels and target page object IDs.
 fn import_document_bookmarks(source: &Document, target: &mut Document) {
-    // First check if `source` has in-memory bookmarks (e.g. via `add_bookmark`)
     if !source.bookmarks.is_empty() {
         copy_in_memory_bookmarks(source, &source.bookmarks, None, target);
         return;
     }
 
-    // Otherwise extract from the PDF `/Outlines` dictionary via `get_toc()`
     let Ok(toc) = source.get_toc() else {
         return;
     };
@@ -222,7 +293,6 @@ fn import_document_bookmarks(source: &Document, target: &mut Document) {
     }
 
     let pages = source.get_pages();
-    // Keep track of parent bookmark IDs by 1-based level
     let mut level_parents: BTreeMap<usize, u32> = BTreeMap::new();
 
     for entry in toc.toc {
@@ -233,7 +303,6 @@ fn import_document_bookmarks(source: &Document, target: &mut Document) {
 
         let level = entry.level.max(1);
         let parent_id = if level > 1 {
-            // Find the closest ancestor at a higher level
             level_parents.range(1..level).next_back().map(|(_, &id)| id)
         } else {
             None
@@ -242,7 +311,6 @@ fn import_document_bookmarks(source: &Document, target: &mut Document) {
         let bm = Bookmark::new(entry.title, [0.0, 0.0, 0.0], 0, page_obj_id);
         let new_id = target.add_bookmark(bm, parent_id);
         level_parents.insert(level, new_id);
-        // Clear any deeper levels from previous branches
         level_parents.retain(|&lvl, _| lvl <= level);
     }
 }

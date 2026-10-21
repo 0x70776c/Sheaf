@@ -23,4 +23,19 @@ tests/fixtures      -> Test-PDFs (normal, kaputt, verschlüsselt, 500+ Seiten, F
 - Originaldateien nie verändern.
 
 ## Fehlerklassen (SheafError)
-Io, InvalidPdf, Encrypted, WrongPassword, PageOutOfRange, EmptySelection, Unsupported, Cancelled
+Io, InvalidPdf, Encrypted, WrongPassword, PageOutOfRange, EmptySelection, InvalidSelection, OutputExists, Unsupported, Cancelled
+
+## CLI-Vertrag (verbindlich für jedes Feature)
+
+- Jedes Feature ist per CLI nutzbar, bevor es eine UI bekommt. Kein Feature ohne Subcommand.
+- Nie interaktiv: keine Prompts, keine Rückfragen. Fehlende Infos = Fehler + Exit-Code.
+- stdout = ausschließlich Ergebnis (bei --json genau EIN JSON-Objekt). stderr = Logs, Fortschritt, Warnungen.
+- Jeder Befehl unterstützt: --json, --dry-run, --force, --quiet, --progress, --no-color.
+- Ausgabedateien werden atomisch geschrieben (temp-Datei im Zielordner, dann rename).
+- Bestehende Ausgabedatei ohne --force = Fehler OutputExists (Exit 7). Eingabedatei wird nie überschrieben.
+- Exit-Codes und JSON-Fehlercodes sind stabil (Tabelle in SHEAF_MILESTONE_2.md). Änderungen nur mit Schema-Version-Bump.
+- JSON-Envelope trägt "schema": 1. Felder werden nur hinzugefügt, nie umbenannt/entfernt.
+- Jeder Subcommand: --help mit mindestens zwei Beispielen (clap `after_help`).
+- Result-/Report-Structs liegen in sheaf-core (derive Serialize), die CLI serialisiert sie nur.
+- Neues Feature = neuer Subcommand + CLI-Integrationstest (assert_cmd) + Eintrag in `sheaf capabilities`.
+

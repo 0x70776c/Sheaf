@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// Error type for all Sheaf PDF operations.
 ///
-/// Messages are formatted to be user-friendly and understandable without
-/// exposing low-level internal error codes.
+/// Messages are formatted in German to be user-friendly, while [`SheafError::code`]
+/// provides a stable English identifier for JSON and machine consumers.
 #[derive(Debug, Error)]
 pub enum SheafError {
     /// File system read/write error.
@@ -24,7 +24,7 @@ pub enum SheafError {
     WrongPassword,
 
     /// A requested 1-based page number exceeds the document's page count or is 0.
-    #[error("Seite {page} liegt außerhalb des gültigen Bereichs (1–{total})")]
+    #[error("Seite {page} existiert nicht (Dokument hat {total} Seiten).")]
     PageOutOfRange {
         /// The requested 1-based page number.
         page: u32,
@@ -36,8 +36,16 @@ pub enum SheafError {
     #[error("Keine Seiten oder Dateien ausgewählt")]
     EmptySelection,
 
-    /// The PDF uses a feature that is not supported.
-    #[error("Nicht unterstützte Funktion: {0}")]
+    /// Invalid page range syntax or invalid selection argument (e.g. `5-3`, `abc`, `N=0`).
+    #[error("Ungültige Auswahl: {0}")]
+    InvalidSelection(String),
+
+    /// Target output file already exists and `--force` was not set.
+    #[error("Ausgabedatei existiert bereits: {}", .0.display())]
+    OutputExists(PathBuf),
+
+    /// The PDF uses a feature that is not supported or lacks required elements (e.g. outlines).
+    #[error("Nicht unterstützt: {0}")]
     Unsupported(String),
 
     /// The operation was cancelled by the user.
@@ -46,6 +54,71 @@ pub enum SheafError {
 }
 
 impl SheafError {
+    /// Returns the stable machine-readable error code for this error variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sheaf_core::SheafError;
+    ///
+    /// assert_eq!(SheafError::Encrypted.code(), "encrypted");
+    /// assert_eq!(SheafError::EmptySelection.code(), "empty_selection");
+    /// ```
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Io(_) => "io",
+            Self::InvalidPdf(_) => "invalid_pdf",
+            Self::Encrypted => "encrypted",
+            Self::WrongPassword => "wrong_password",
+            Self::PageOutOfRange { .. } => "page_out_of_range",
+            Self::EmptySelection => "empty_selection",
+            Self::InvalidSelection(_) => "invalid_selection",
+            Self::OutputExists(_) => "output_exists",
+            Self::Unsupported(_) => "unsupported",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    /// Returns an optional user-facing hint explaining how to resolve the error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    /// use sheaf_core::SheafError;
+    ///
+    /// let err = SheafError::OutputExists(PathBuf::from("out.pdf"));
+    /// assert!(err.hint().is_some());
+    /// ```
+    pub fn hint(&self) -> Option<String> {
+        match self {
+            Self::Io(_) => Some("Prüfe Pfad und Zugriffsrechte.".to_string()),
+            Self::InvalidPdf(_) => Some("Prüfe die Datei mit 'sheaf verify <datei>'.".to_string()),
+            Self::Encrypted => {
+                Some("Entferne zuerst den Passwortschutz der PDF-Datei.".to_string())
+            }
+            Self::WrongPassword => Some("Bitte prüfe das eingegebene Passwort.".to_string()),
+            Self::PageOutOfRange { total, .. } => {
+                if *total > 0 {
+                    Some(format!("Gültiger Bereich: 1-{total}."))
+                } else {
+                    Some("Das Dokument enthält keine Seiten.".to_string())
+                }
+            }
+            Self::EmptySelection => {
+                Some("Gib mindestens eine Datei oder einen Seitenbereich an.".to_string())
+            }
+            Self::InvalidSelection(_) => {
+                Some("Erwartetes Format für Seitenbereiche: z. B. '1-3,5,8-'.".to_string())
+            }
+            Self::OutputExists(_) => Some(
+                "Verwende '--force', um bestehende Ausgabedateien zu überschreiben.".to_string(),
+            ),
+            Self::Unsupported(msg) => Some(msg.clone()),
+            Self::Cancelled => None,
+        }
+    }
+
     /// Maps a [`lopdf::Error`] into a user-friendly [`SheafError`].
     pub fn from_lopdf(err: lopdf::Error) -> Self {
         match err {
@@ -60,7 +133,7 @@ impl SheafError {
     }
 
     /// Maps a [`lopdf::Error`] while attaching the file path for context.
-    pub fn from_lopdf_with_path(err: lopdf::Error, path: &std::path::Path) -> Self {
+    pub fn from_lopdf_with_path(err: lopdf::Error, path: &Path) -> Self {
         let display = path.display();
         match err {
             lopdf::Error::IO(io_err) => Self::Io(io_err),
@@ -83,20 +156,20 @@ impl From<lopdf::Error> for SheafError {
 /// Checks if a target output path matches any of the input paths to ensure original files are never overwritten.
 pub(crate) fn ensure_not_overwriting_inputs(
     inputs: &[PathBuf],
-    out: &std::path::Path,
+    out: &Path,
 ) -> Result<(), SheafError> {
     let out_canonical = std::fs::canonicalize(out).ok();
     for input in inputs {
         if input == out {
-            return Err(SheafError::InvalidPdf(
-                "Ausgabedatei darf die Originaldatei nicht überschreiben".to_string(),
+            return Err(SheafError::InvalidSelection(
+                "Ausgabedatei darf die Eingabedatei nicht überschreiben".to_string(),
             ));
         }
         if let (Some(in_can), Some(out_can)) = (std::fs::canonicalize(input).ok(), &out_canonical)
             && &in_can == out_can
         {
-            return Err(SheafError::InvalidPdf(
-                "Ausgabedatei darf die Originaldatei nicht überschreiben".to_string(),
+            return Err(SheafError::InvalidSelection(
+                "Ausgabedatei darf die Eingabedatei nicht überschreiben".to_string(),
             ));
         }
     }

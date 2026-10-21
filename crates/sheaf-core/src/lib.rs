@@ -6,9 +6,16 @@
 #![warn(missing_docs)]
 
 mod error;
+pub mod fs;
 pub mod ops;
 mod progress;
 
+/// Current JSON output schema version.
+pub const SCHEMA_VERSION: u32 = 1;
+
 pub use error::SheafError;
-pub use ops::merge::merge;
+pub use ops::capabilities::{CapabilitiesReport, capabilities};
+pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
+pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
+pub use ops::verify::{VerifyFileResult, VerifyOptions, VerifyReport, verify};
 pub use progress::{NoProgress, Progress};
