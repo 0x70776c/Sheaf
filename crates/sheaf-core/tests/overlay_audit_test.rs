@@ -4,9 +4,10 @@ use image::GenericImageView;
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, Stream, StringFormat, dictionary};
 use sheaf_core::{
-    NoProgress, OverlayPosition, PageOverlaySpec, RenderOptions, RenderScale, SheafError,
-    WatermarkOptions, WatermarkPosition, apply_overlay_to_page, get_effective_page_box,
-    is_pdfium_available, render_with_options, watermark,
+    NoProgress, NumberOptions, NumberPosition, OverlayPosition, PageOverlaySpec, RenderOptions,
+    RenderScale, SheafError, WatermarkOptions, WatermarkPosition, apply_overlay_to_page,
+    format_page_number, get_effective_page_box, is_pdfium_available, number, render_with_options,
+    watermark,
 };
 use tempfile::TempDir;
 
@@ -636,4 +637,47 @@ fn test_overlay_audit_10_text_remains_selectable() {
     let new_text = reloaded.extract_text(&[1]).unwrap();
     assert!(new_text.contains(orig_text.trim()));
     assert!(new_text.contains("SELECTABLE-OVERLAY-TEXT"));
+}
+
+#[test]
+fn test_number_placeholders_and_subset_pages() {
+    let dir = TempDir::new().unwrap();
+    let src = fixture_path("fixture_b_3p.pdf");
+    let out = dir.path().join("numbered.pdf");
+
+    let opts = NumberOptions {
+        format: "N={n} T={total} P={page} ALL={pages}".to_string(),
+        position: NumberPosition::BottomRight,
+        start: 10,
+        pages: Some("2-3".to_string()),
+        out: Some(out.clone()),
+        ..NumberOptions::default()
+    };
+
+    let report = number(&src, &opts, &NoProgress).unwrap();
+    assert_eq!(report.pages_numbered, vec![2, 3]);
+    assert_eq!(report.total_pages, 3);
+
+    let doc = Document::load(&out).unwrap();
+    let p1_text = doc.extract_text(&[1]).unwrap();
+    let p2_text = doc.extract_text(&[2]).unwrap();
+    let p3_text = doc.extract_text(&[3]).unwrap();
+
+    assert!(!p1_text.contains("N=10"));
+    assert!(p2_text.contains("N=10 T=2 P=2 ALL=3"));
+    assert!(p3_text.contains("N=11 T=2 P=3 ALL=3"));
+}
+
+#[test]
+fn test_number_default_output_and_invalid_placeholder() {
+    let dir = TempDir::new().unwrap();
+    let src = dir.path().join("doc.pdf");
+    std::fs::copy(fixture_path("fixture_c_1p.pdf"), &src).unwrap();
+
+    let report = number(&src, &NumberOptions::default(), &NoProgress).unwrap();
+    assert_eq!(report.output, dir.path().join("doc_numbered.pdf"));
+    assert!(report.output.exists());
+
+    assert!(format_page_number("{bad}", 1, 1, 1, 1).is_err());
+    assert!(format_page_number("unclosed {n", 1, 1, 1, 1).is_err());
 }

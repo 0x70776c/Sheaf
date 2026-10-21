@@ -26,6 +26,7 @@ pub use ops::convert::{
 };
 pub use ops::info::{FileInfo, InfoReport, PdfMetadataInfo, info};
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
+pub use ops::number::{NumberOptions, NumberPosition, NumberReport, format_page_number, number};
 pub use ops::overlay::{
     OverlayPosition, PageBox, PageOverlaySpec, apply_overlay_to_page, encode_win_ansi,
     get_effective_page_box, parse_overlay_color,

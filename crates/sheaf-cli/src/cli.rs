@@ -104,6 +104,12 @@ pub enum Commands {
     )]
     Watermark(WatermarkArgs),
 
+    /// Stamp customizable page numbers onto PDF pages
+    #[command(
+        after_help = "Examples:\n  sheaf number report.pdf -o numbered.pdf\n  sheaf number thesis.pdf --format \"Page {n} of {total}\" --position bottom-right --start 1 --pages \"2-\" -o thesis_numbered.pdf --json"
+    )]
+    Number(NumberArgs),
+
     /// Password-protect (encrypt) a PDF file
     #[command(
         after_help = "Examples:\n  sheaf protect report.pdf --password \"secret123\" -o protected.pdf\n  sheaf protect contract.pdf --password \"open-pw\" --owner-password \"owner-pw\" --no-copy -o locked.pdf --json"
@@ -458,6 +464,48 @@ pub struct WatermarkArgs {
     pub pages: Option<String>,
 
     /// Target output PDF file (defaults to {stem}_watermarked.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct NumberArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    /// Page number format template supporting {n}, {total}, {page}, and {pages}
+    #[arg(long, default_value = "{n} / {total}")]
+    pub format: String,
+
+    /// Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left
+    #[arg(long, default_value = "bottom-center")]
+    pub position: String,
+
+    /// Starting sequence number for {n} on the first selected page
+    #[arg(long, default_value_t = 1)]
+    pub start: u32,
+
+    /// Font size in PDF points (6..=300)
+    #[arg(long, default_value_t = 11.0)]
+    pub font_size: f32,
+
+    /// Opacity between 0.05 and 1.0
+    #[arg(long, default_value_t = 1.0)]
+    pub opacity: f32,
+
+    /// Color as #RRGGBB hex or preset name (gray, red, blue, black, green)
+    #[arg(long, default_value = "#111827")]
+    pub color: String,
+
+    /// Margin inset from page edges in PDF points (0..=200)
+    #[arg(long, default_value_t = 28.0)]
+    pub margin: f32,
+
+    /// Optional 1-based page ranges to number (omit to number all pages)
+    #[arg(long)]
+    pub pages: Option<String>,
+
+    /// Target output PDF file (defaults to {stem}_numbered.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
 }

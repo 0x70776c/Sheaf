@@ -120,4 +120,32 @@ fn cli_watermark_protect_and_unlock_end_to_end() {
     assert_eq!(env_unl["op"], "unlock");
     assert_eq!(env_unl["data"]["encrypted"], false);
     assert_eq!(env_unl["data"]["pages"], 3);
+
+    // 5. sheaf number
+    let numbered_pdf = temp.path().join("numbered.pdf");
+    let out_num = sheaf_cmd()
+        .args([
+            "number",
+            src_3p.to_str().unwrap(),
+            "--format",
+            "Page {n} of {total} ({page}/{pages})",
+            "--position",
+            "bottom-right",
+            "--start",
+            "1",
+            "--pages",
+            "2-3",
+            "-o",
+            numbered_pdf.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run sheaf number");
+    assert_eq!(out_num.status.code(), Some(0));
+    assert!(numbered_pdf.exists());
+    let env_num: Value = serde_json::from_slice(&out_num.stdout).expect("parse json");
+    assert_eq!(env_num["ok"], true);
+    assert_eq!(env_num["op"], "number");
+    assert_eq!(env_num["data"]["position"], "bottom-right");
+    assert_eq!(env_num["data"]["pages_numbered"], serde_json::json!([2, 3]));
 }

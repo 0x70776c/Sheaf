@@ -93,6 +93,7 @@ fn main() -> ExitCode {
         Commands::Compress(args) => execute_command(args, &cli.global, cancelled),
         Commands::Convert(args) => execute_command(args, &cli.global, cancelled),
         Commands::Watermark(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Number(args) => execute_command(args, &cli.global, cancelled),
         Commands::Protect(args) => execute_command(args, &cli.global, cancelled),
         Commands::Unlock(args) => execute_command(args, &cli.global, cancelled),
         Commands::Info(args) => execute_command(args, &cli.global, cancelled),
