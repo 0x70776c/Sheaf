@@ -393,7 +393,11 @@ fn test_cli_meta_output_exists_exit_7() {
         ])
         .output()
         .expect("run meta set target exists");
-    assert_eq!(out.status.code(), Some(7), "Existing output without --force must exit 7");
+    assert_eq!(
+        out.status.code(),
+        Some(7),
+        "Existing output without --force must exit 7"
+    );
 }
 
 #[test]
@@ -413,7 +417,11 @@ fn test_cli_meta_multi_get_corrupted_file_exit_3() {
         .output()
         .expect("run meta get with corrupted file");
 
-    assert_eq!(out.status.code(), Some(3), "Corrupted PDF in meta get must return exit 3");
+    assert_eq!(
+        out.status.code(),
+        Some(3),
+        "Corrupted PDF in meta get must return exit 3"
+    );
     let val: serde_json::Value = serde_json::from_slice(&out.stdout).expect("parse json");
     assert_eq!(val["ok"], false);
     assert_eq!(val["error"]["code"], "invalid_pdf");
@@ -456,8 +464,14 @@ fn test_cli_meta_secret_leak_canary() {
     assert!(get_out.status.success());
     let get_stdout = String::from_utf8_lossy(&get_out.stdout);
     let get_stderr = String::from_utf8_lossy(&get_out.stderr);
-    assert!(!get_stdout.contains(canary), "Canary must not leak to stdout in meta get");
-    assert!(!get_stderr.contains(canary), "Canary must not leak to stderr in meta get");
+    assert!(
+        !get_stdout.contains(canary),
+        "Canary must not leak to stdout in meta get"
+    );
+    assert!(
+        !get_stderr.contains(canary),
+        "Canary must not leak to stderr in meta get"
+    );
 
     // 3. meta set with canary password
     let set_out_path = temp.path().join("set_unlocked.pdf");
@@ -479,8 +493,14 @@ fn test_cli_meta_secret_leak_canary() {
     assert!(set_out.status.success());
     let set_stdout = String::from_utf8_lossy(&set_out.stdout);
     let set_stderr = String::from_utf8_lossy(&set_out.stderr);
-    assert!(!set_stdout.contains(canary), "Canary must not leak to stdout in meta set");
-    assert!(!set_stderr.contains(canary), "Canary must not leak to stderr in meta set");
+    assert!(
+        !set_stdout.contains(canary),
+        "Canary must not leak to stdout in meta set"
+    );
+    assert!(
+        !set_stderr.contains(canary),
+        "Canary must not leak to stderr in meta set"
+    );
 
     // 4. meta strip with canary password
     let strip_out_path = temp.path().join("strip_unlocked.pdf");
@@ -500,6 +520,12 @@ fn test_cli_meta_secret_leak_canary() {
     assert!(strip_out.status.success());
     let strip_stdout = String::from_utf8_lossy(&strip_out.stdout);
     let strip_stderr = String::from_utf8_lossy(&strip_out.stderr);
-    assert!(!strip_stdout.contains(canary), "Canary must not leak to stdout in meta strip");
-    assert!(!strip_stderr.contains(canary), "Canary must not leak to stderr in meta strip");
+    assert!(
+        !strip_stdout.contains(canary),
+        "Canary must not leak to stdout in meta strip"
+    );
+    assert!(
+        !strip_stderr.contains(canary),
+        "Canary must not leak to stderr in meta strip"
+    );
 }

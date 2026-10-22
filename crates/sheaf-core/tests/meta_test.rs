@@ -53,7 +53,10 @@ fn test_meta_set_get_roundtrip_unicode_cjk_emoji() {
     let keywords_val = "Rust, PDF, 🦀, 2026";
 
     let mut custom = BTreeMap::new();
-    custom.insert("Abteilung".to_string(), "Forschung & Entwicklung".to_string());
+    custom.insert(
+        "Abteilung".to_string(),
+        "Forschung & Entwicklung".to_string(),
+    );
     custom.insert("Emoji-Key".to_string(), "🌟 Star 🌟".to_string());
 
     let set_opts = MetaSetOptions {
@@ -83,7 +86,8 @@ fn test_meta_set_get_roundtrip_unicode_cjk_emoji() {
         load: LoadOptions::none(),
         include_xmp_packet: true,
     };
-    let get_rep = meta_get(&[out.clone()], &get_opts, &NoProgress).expect("meta_get failed");
+    let get_rep =
+        meta_get(std::slice::from_ref(&out), &get_opts, &NoProgress).expect("meta_get failed");
     assert_eq!(get_rep.files.len(), 1);
     let f = &get_rep.files[0];
 
@@ -201,7 +205,10 @@ fn test_meta_operations_preserve_content_stream_bytes() {
         let p_id_set = *set_pages.get(&p).unwrap();
         let c_orig = orig.doc.get_page_content(p_id_orig);
         let c_set = after_set.doc.get_page_content(p_id_set);
-        assert_eq!(c_orig, c_set, "Page {p} content must not change after meta_set");
+        assert_eq!(
+            c_orig, c_set,
+            "Page {p} content must not change after meta_set"
+        );
     }
 
     // 2. Run meta_strip
@@ -224,7 +231,10 @@ fn test_meta_operations_preserve_content_stream_bytes() {
         let p_id_strip = *strip_pages.get(&p).unwrap();
         let c_orig = orig.doc.get_page_content(p_id_orig);
         let c_strip = after_strip.doc.get_page_content(p_id_strip);
-        assert_eq!(c_orig, c_strip, "Page {p} content must not change after meta_strip");
+        assert_eq!(
+            c_orig, c_strip,
+            "Page {p} content must not change after meta_strip"
+        );
     }
 }
 
@@ -256,13 +266,19 @@ fn test_meta_strip_removes_all_metadata_and_piece_info() {
     assert!(loaded.doc.trailer.get(b"Info").is_err());
 
     // Catalog must not have /Metadata or /PieceInfo
-    let root_id = loaded.doc.trailer.get(b"Root").unwrap().as_reference().unwrap();
+    let root_id = loaded
+        .doc
+        .trailer
+        .get(b"Root")
+        .unwrap()
+        .as_reference()
+        .unwrap();
     let root_dict = loaded.doc.get_dictionary(root_id).unwrap();
     assert!(!root_dict.has(b"Metadata"));
     assert!(!root_dict.has(b"PieceInfo"));
 
     // Pages must not have /PieceInfo or /Metadata
-    for (_p, &p_id) in loaded.doc.get_pages().iter() {
+    for &p_id in loaded.doc.get_pages().values() {
         let p_dict = loaded.doc.get_dictionary(p_id).unwrap();
         assert!(!p_dict.has(b"Metadata"));
         assert!(!p_dict.has(b"PieceInfo"));
