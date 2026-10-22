@@ -351,12 +351,12 @@ Stamp customizable page numbers onto PDF pages
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
 | `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
-| `--format` | `<FORMAT>` | No | Page number format template supporting {n}, {total}, {page}, and {pages} (default: `{n} / {total}`) |
+| `--format` | `<FORMAT>` | No | Page number format template supporting {n}, {total}, {page}, and {pages} (default: `{n}`) |
 | `--position` | `<POSITION>` | No | Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left (default: `bottom-center`) |
 | `--start` | `<START>` | No | Starting sequence number for {n} on the first selected page (default: `1`) |
-| `--font-size` | `<FONT_SIZE>` | No | Font size in PDF points (6..=300) (default: `11`) |
+| `--font-size` | `<FONT_SIZE>` | No | Font size in PDF points (4..=72) (default: `10`) |
 | `--opacity` | `<OPACITY>` | No | Opacity between 0.05 and 1.0 (default: `1`) |
-| `--color` | `<COLOR>` | No | Color as #RRGGBB hex or preset name (gray, red, blue, black, green) (default: `#111827`) |
+| `--color` | `<COLOR>` | No | Color as #RRGGBB hex or preset name (gray, red, blue, black, green) (default: `#444444`) |
 | `--margin` | `<MARGIN>` | No | Margin inset from page edges in PDF points (0..=200) (default: `28`) |
 | `--pages` | `<PAGES>` | No | Optional 1-based page ranges to number (omit to number all pages) |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_numbered.pdf) |

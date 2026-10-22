@@ -123,12 +123,12 @@
   let watermarkOutPath = $state<string | null>(null);
 
   // Number options
-  let numberFormat = $state('{n} / {total}');
+  let numberFormat = $state('{n}');
   let numberPosition = $state<NumberPositionUi>('bottom-center');
   let numberStart = $state<number>(1);
-  let numberFontSize = $state<number>(11);
+  let numberFontSize = $state<number>(10);
   let numberOpacity = $state<number>(1.0);
-  let numberColor = $state('#111827');
+  let numberColor = $state('#444444');
   let numberMargin = $state<number>(28);
   let numberPagesSpec = $state('');
   let numberOutPath = $state<string | null>(null);
@@ -1756,7 +1756,7 @@
                       step="1"
                       value={numberFontSize}
                       oninput={(e) => {
-                        numberFontSize = Number(e.currentTarget.value) || 11;
+                        numberFontSize = Number(e.currentTarget.value) || 10;
                       }}
                     />
                   </div>

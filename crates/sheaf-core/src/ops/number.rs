@@ -98,11 +98,11 @@ pub struct NumberOptions {
     pub position: NumberPosition,
     /// Starting number for `{n}` on the first selected page (default `1`).
     pub start: u32,
-    /// Font size in PDF points (`6.0..=300.0`, default `11.0`).
+    /// Font size in PDF points (`4.0..=72.0`, default `10.0`).
     pub font_size: f32,
     /// Opacity (`0.05..=1.0`, default `1.0`).
     pub opacity: f32,
-    /// Color as `#RRGGBB` hex or named preset (`gray`, `red`, `blue`, `black`; default `#111827`).
+    /// Color as `#RRGGBB` hex or named preset (`gray`, `red`, `blue`, `black`; default `#444444`).
     pub color: String,
     /// Margin inset from page edges in PDF points (`0.0..=200.0`, default `28.0`).
     pub margin: f32,
@@ -120,12 +120,12 @@ impl Default for NumberOptions {
     fn default() -> Self {
         Self {
             load: LoadOptions::default(),
-            format: "{n} / {total}".to_string(),
+            format: "{n}".to_string(),
             position: NumberPosition::BottomCenter,
             start: 1,
-            font_size: 11.0,
+            font_size: 10.0,
             opacity: 1.0,
-            color: "#111827".to_string(),
+            color: "#444444".to_string(),
             margin: 28.0,
             pages: None,
             out: None,
@@ -275,9 +275,9 @@ pub fn number(
             "Starting page number (--start) must be >= 1".to_string(),
         ));
     }
-    if !(6.0..=300.0).contains(&opts.font_size) {
+    if !(4.0..=72.0).contains(&opts.font_size) {
         return Err(SheafError::InvalidSelection(format!(
-            "Page number font size must be between 6 and 300 pt (got {})",
+            "Page number font size must be between 4 and 72 pt (got {})",
             opts.font_size
         )));
     }

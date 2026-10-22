@@ -551,7 +551,7 @@ pub struct NumberArgs {
     pub password_opts: OpenPasswordArgs,
 
     /// Page number format template supporting {n}, {total}, {page}, and {pages}
-    #[arg(long, default_value = "{n} / {total}")]
+    #[arg(long, default_value = "{n}")]
     pub format: String,
 
     /// Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left
@@ -562,8 +562,8 @@ pub struct NumberArgs {
     #[arg(long, default_value_t = 1)]
     pub start: u32,
 
-    /// Font size in PDF points (6..=300)
-    #[arg(long, default_value_t = 11.0)]
+    /// Font size in PDF points (4..=72)
+    #[arg(long, default_value_t = 10.0)]
     pub font_size: f32,
 
     /// Opacity between 0.05 and 1.0
@@ -571,7 +571,7 @@ pub struct NumberArgs {
     pub opacity: f32,
 
     /// Color as #RRGGBB hex or preset name (gray, red, blue, black, green)
-    #[arg(long, default_value = "#111827")]
+    #[arg(long, default_value = "#444444")]
     pub color: String,
 
     /// Margin inset from page edges in PDF points (0..=200)

@@ -215,14 +215,14 @@ sheaf watermark draft.pdf --text "DRAFT" --position bottom-right --color red --o
 ---
 
 ### 8. `sheaf number`
-Stamp vector page numbers onto PDF pages with format placeholders (`{n}`, `{total}`, `{page}`, `{pages}`), placement presets, start number, and page selection:
+Stamp vector page numbers onto PDF pages with format placeholders (`{n}`, `{total}`, `{page}`, `{pages}`), placement presets, start number, font size, color, opacity (`--opacity`, 0.05..=1.0), and page selection:
 
 ```bash
-# Bottom-center page numbering across all pages
+# Bottom-center page numbering across all pages (default format: {n})
 sheaf number report.pdf -o report_numbered.pdf
 
-# Bottom-right numbering starting at page 2, skipping cover page
-sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right --start 1 --pages "2-" -o thesis_numbered.pdf --json
+# Bottom-right numbering starting at page 2 with opacity, skipping cover page
+sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right --start 1 --pages "2-" --opacity 0.8 -o thesis_numbered.pdf --json
 ```
 
 ---
