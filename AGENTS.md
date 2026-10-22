@@ -67,3 +67,19 @@ Io, InvalidPdf, Encrypted, WrongPassword, PageOutOfRange, EmptySelection, Invali
 - Datumswerte: PDF-Format `D:YYYYMMDDHHmmSSOHH'mm'`, Ausgabe in JSON immer ISO-8601 plus Rohwert.
 - `SOURCE_DATE_EPOCH` (Sekunden seit Epoch) überschreibt "jetzt" für deterministische Tests und Builds.
 - Metadaten-Operationen ändern nie Seiteninhalte.
+
+## Release (Open Source, ohne Apple-Account)
+- Releases entstehen nur aus einem Git-Tag `vX.Y.Z` über `release.yml`.
+- Keine Signing-Secrets. Artefakte sind ad-hoc signiert und werden mit `SHA256SUMS` und Build-Provenance ausgeliefert.
+- Reproduzierbar: `rust-toolchain.toml`, `Cargo.lock`, `package-lock.json` committet, Builds mit `--locked` / `npm ci`.
+- Versionsnummer an einer Stelle (Workspace-`Cargo.toml`), `scripts/bump-version.sh` synchronisiert Tauri und npm, ein Test erzwingt Gleichheit.
+- GitHub Actions: Berechtigungen minimal (`contents: read`, Schreibrechte nur im Release-Job), Actions auf feste Versionen pinnen (Commit-SHA bevorzugt).
+
+## Git
+- Kein force-push auf `main`, kein History-Rewrite ohne ausdrückliche Freigabe.
+- Merge von Milestone-Branches mit `--no-ff`, Branches danach löschen (lokal und remote), sobald nachweislich gemergt.
+- Nur Quellen committen: keine Build-Artefakte, Binaries (`*.dylib`), `node_modules`, `target`, generierte Fixtures.
+
+## Fehlerkontrakt bei Abstürzen
+- Ein Panic erzeugt bei `--json` trotzdem genau ein JSON-Envelope (`internal`, Exit 1), nie Secrets.
+
