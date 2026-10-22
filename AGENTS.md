@@ -55,3 +55,15 @@ Io, InvalidPdf, Encrypted, WrongPassword, PageOutOfRange, EmptySelection, Invali
 - Abschlussberichte enthalten rohe Tool-Ausgaben, keine Paraphrasen der CLI.
 
 
+
+## Berichte
+- Abschlussberichte enthalten eine Spec-Ist-Tabelle mit Belegen und rohe Tool-Ausgaben.
+- "Keine Abweichungen" ist nur zulässig, wenn die Tabelle jeden Punkt der Spezifikation abdeckt.
+- Milestone-Dokumente liegen in `docs/milestones/` und sind Teil des Repos.
+
+## Metadaten
+- Textstrings im Info-Dict: lesen als PDFDocEncoding oder UTF-16BE (BOM `FE FF`) oder UTF-8 (BOM `EF BB BF`).
+  Schreiben: PDFDocEncoding, wenn alle Zeichen darstellbar, sonst UTF-16BE mit BOM.
+- Datumswerte: PDF-Format `D:YYYYMMDDHHmmSSOHH'mm'`, Ausgabe in JSON immer ISO-8601 plus Rohwert.
+- `SOURCE_DATE_EPOCH` (Sekunden seit Epoch) überschreibt "jetzt" für deterministische Tests und Builds.
+- Metadaten-Operationen ändern nie Seiteninhalte.
