@@ -20,6 +20,12 @@ apps/desktop/src-tauri/gen/
 *.snap.new
 tests/fixtures/generated/
 
+# Internal Milestone & Spec Documents (not for public release)
+docs/milestones/
+SHEAF_MILESTONE_*.md
+SHEAF_RELEASE_*.md
+*.bundle
+
 # macOS / Editor
 .DS_Store
 .idea/

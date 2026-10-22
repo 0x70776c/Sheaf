@@ -1,53 +1,71 @@
 <script lang="ts">
-  import { Search } from '@lucide/svelte';
-  import { TOOLS } from '../tools';
+  import { Search, Settings } from '@lucide/svelte';
+  import { getLocalizedTools } from '../tools';
   import type { ToolId } from '../types';
+  import type { Language } from '../i18n';
+  import { translations } from '../i18n';
+  import { startWindowDrag } from '../tauri';
   import ToolIcon from './ToolIcon.svelte';
 
   interface Props {
     activeTool: ToolId;
+    lang: Language;
     onSelectTool: (tool: ToolId) => void;
     onOpenCommandPalette: () => void;
+    onOpenSettings: () => void;
   }
 
-  let { activeTool, onSelectTool, onOpenCommandPalette }: Props = $props();
+  let {
+    activeTool,
+    lang = 'en',
+    onSelectTool,
+    onOpenCommandPalette,
+    onOpenSettings,
+  }: Props = $props();
 
-  const primaryTools = TOOLS.filter((t) => t.group === 'primary');
-  const secondaryTools = TOOLS.filter((t) => t.group === 'secondary');
+  let t = $derived(translations[lang]);
+  let tools = $derived(getLocalizedTools(lang));
+  let primaryTools = $derived(tools.filter((it) => it.group === 'primary'));
+  let secondaryTools = $derived(tools.filter((it) => it.group === 'secondary'));
 
   function handleNavKeydown(event: KeyboardEvent) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
-    const index = TOOLS.findIndex((t) => t.id === activeTool);
+    const index = tools.findIndex((it) => it.id === activeTool);
     if (index === -1) return;
     const nextIndex =
       event.key === 'ArrowDown'
-        ? (index + 1) % TOOLS.length
-        : (index - 1 + TOOLS.length) % TOOLS.length;
-    onSelectTool(TOOLS[nextIndex].id);
+        ? (index + 1) % tools.length
+        : (index - 1 + tools.length) % tools.length;
+    onSelectTool(tools[nextIndex].id);
   }
 </script>
 
 <aside class="sidebar" aria-label="Tools Navigation">
-  <div class="titlebar-spacer" data-tauri-drag-region></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="titlebar-spacer drag-region"
+    data-tauri-drag-region
+    onpointerdown={startWindowDrag}
+  ></div>
 
-  <div class="palette-trigger-wrap">
+  <div class="palette-trigger-wrap no-drag">
     <button
       type="button"
       class="palette-trigger"
       onclick={onOpenCommandPalette}
-      aria-label="Open Command Palette (Command+K)"
+      aria-label={`${t.switchTool} (Command+K)`}
     >
       <span class="palette-trigger-left">
         <Search size={14} strokeWidth={1.5} aria-hidden="true" />
-        <span>Switch tool...</span>
+        <span>{t.switchTool}</span>
       </span>
       <kbd class="kbd">⌘K</kbd>
     </button>
   </div>
 
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <nav class="nav-list" aria-label="PDF Tools" onkeydown={handleNavKeydown}>
+  <nav class="nav-list no-drag" aria-label="PDF Tools" onkeydown={handleNavKeydown}>
     <div class="nav-group" role="group" aria-label="Core Tools">
       {#each primaryTools as item (item.id)}
         <button
@@ -84,6 +102,19 @@
       {/each}
     </div>
   </nav>
+
+  <div class="sidebar-footer no-drag">
+    <button
+      type="button"
+      class="footer-btn"
+      onclick={onOpenSettings}
+      aria-label={t.settings}
+      title={t.settings}
+    >
+      <Settings size={15} strokeWidth={1.5} />
+      <span>{t.settings}</span>
+    </button>
+  </div>
 </aside>
 
 <style>
@@ -94,14 +125,20 @@
     display: flex;
     flex-direction: column;
     background-color: var(--sidebar-surface);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     border-right: 1px solid var(--border);
+    box-shadow: inset -1px 0 0 0 rgba(255, 255, 255, 0.08);
   }
 
   .titlebar-spacer {
     height: var(--titlebar-height);
     flex-shrink: 0;
+    cursor: grab;
+  }
+
+  .titlebar-spacer:active {
+    cursor: grabbing;
   }
 
   .palette-trigger-wrap {
@@ -115,17 +152,22 @@
     justify-content: space-between;
     padding: 6px var(--space-2);
     background-color: var(--surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
     color: var(--text-muted);
     cursor: pointer;
+    box-shadow: var(--glass-glow), 0 1px 3px rgba(0, 0, 0, 0.04);
     transition:
       border-color var(--transition-fast),
+      background-color var(--transition-fast),
       color var(--transition-fast);
   }
 
   .palette-trigger:hover {
     border-color: var(--accent);
+    background-color: var(--surface-hover);
     color: var(--text);
   }
 
@@ -140,7 +182,7 @@
     font-family: var(--font-sans);
     font-size: 11px;
     color: var(--text-muted);
-    background-color: var(--bg);
+    background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 1px 5px;
@@ -164,6 +206,7 @@
     height: 1px;
     background-color: var(--border);
     margin: var(--space-3) var(--space-1);
+    opacity: 0.7;
   }
 
   .nav-item {
@@ -182,11 +225,12 @@
     cursor: pointer;
     transition:
       background-color var(--transition-fast),
-      color var(--transition-fast);
+      color var(--transition-fast),
+      transform var(--transition-fast);
   }
 
   .nav-item:hover {
-    background-color: var(--surface);
+    background-color: var(--surface-hover);
     color: var(--text);
   }
 
@@ -194,6 +238,7 @@
     background-color: var(--accent-subtle);
     color: var(--accent);
     font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.25);
   }
 
   .active-pill {
@@ -216,5 +261,34 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .sidebar-footer {
+    padding: var(--space-2) var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+
+  .footer-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px var(--space-2);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+      background-color var(--transition-fast),
+      border-color var(--transition-fast),
+      color var(--transition-fast);
+  }
+
+  .footer-btn:hover {
+    background-color: var(--surface);
+    border-color: var(--border);
+    color: var(--text);
   }
 </style>

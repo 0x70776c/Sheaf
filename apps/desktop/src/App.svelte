@@ -10,6 +10,7 @@
     ArrowUpDown,
     Lock,
     LockOpen,
+    Settings,
   } from '@lucide/svelte';
   import Sidebar from './lib/components/Sidebar.svelte';
   import DropZone from './lib/components/DropZone.svelte';
@@ -19,7 +20,9 @@
   import MergeFileList from './lib/components/MergeFileList.svelte';
   import Toast from './lib/components/Toast.svelte';
   import InfoPanel from './lib/components/InfoPanel.svelte';
+  import SettingsModal from './lib/components/SettingsModal.svelte';
   import { TOOLS, basename, formatBytes, getToolById } from './lib/tools';
+  import { getInitialLanguage, saveLanguage, translations, type Language } from './lib/i18n';
   import {
     formatSelectedPagesToRanges,
     parseRangesToPageSet,
@@ -48,6 +51,7 @@
     runSplitCommand,
     runWatermarkCommand,
     previewOverlayCommand,
+    startWindowDrag,
   } from './lib/tauri';
   import type {
     CommandErrorPayload,
@@ -71,7 +75,9 @@
 
   let activeTool = $state<ToolId>('merge');
   let theme = $state<ThemePreference>('system');
+  let lang = $state<Language>(getInitialLanguage());
   let paletteOpen = $state(false);
+  let settingsDialogOpen = $state(false);
   let isDraggingOver = $state(false);
 
   let loadedFiles = $state<FileInfo[]>([]);
@@ -154,7 +160,6 @@
   // Transient Session Password & Prompt State (never saved to localStorage / disk)
   let sessionPassword = $state<string | null>(null);
   let passwordDialogOpen = $state(false);
-  let aboutDialogOpen = $state(false);
   let passwordPromptInput = $state('');
   let passwordPromptError = $state<string | null>(null);
   let passwordPromptAttempts = $state(0);
@@ -166,7 +171,8 @@
   let errorBanner = $state<CommandErrorPayload | null>(null);
   let toastNotice = $state<ToastNotice | null>(null);
 
-  let currentToolMeta = $derived(getToolById(activeTool));
+  let t = $derived(translations[lang]);
+  let currentToolMeta = $derived(getToolById(activeTool, lang));
   let primaryFile = $derived<FileInfo | undefined>(loadedFiles[0]);
   let primaryTotalPages = $derived(primaryFile?.pages ?? 0);
   let isReadOnly = $derived(
@@ -753,6 +759,11 @@
     const isInputFocused =
       targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT';
 
+    if (isCmd && event.key === ',') {
+      event.preventDefault();
+      settingsDialogOpen = !settingsDialogOpen;
+      return;
+    }
     if (isCmd && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       paletteOpen = !paletteOpen;
@@ -848,47 +859,60 @@
   <div class="workspace-row">
     <Sidebar
       {activeTool}
+      {lang}
       onSelectTool={(id) => {
         activeTool = id;
       }}
       onOpenCommandPalette={() => {
         paletteOpen = true;
       }}
+      onOpenSettings={() => {
+        settingsDialogOpen = true;
+      }}
     />
 
     <main class="main-column" aria-label={`${currentToolMeta.label} Workspace`}>
-      <header class="titlebar" data-tauri-drag-region>
-        <div class="titlebar-title" data-tauri-drag-region>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <header
+        class="titlebar drag-region"
+        data-tauri-drag-region
+        onpointerdown={startWindowDrag}
+      >
+        <div
+          class="titlebar-title drag-region"
+          data-tauri-drag-region
+          onpointerdown={startWindowDrag}
+        >
           <span class="app-name">Sheaf</span>
           <span class="title-sep" aria-hidden="true">·</span>
           <span class="tool-title">{currentToolMeta.label}</span>
           {#if primaryFile}
             <span class="title-sep" aria-hidden="true">·</span>
             {#if !primaryFile.encrypted}
-              <span class="lock-status-badge unencrypted" title="Datei ist unverschlüsselt">
+              <span class="lock-status-badge unencrypted" title={t.unencryptedDesc}>
                 <LockOpen size={12} strokeWidth={2} />
-                <span>Unverschlüsselt</span>
+                <span>{t.unencrypted}</span>
               </span>
             {:else if isReadOnly}
-              <span class="lock-status-badge readonly" title="Datei ist schreibgeschützt / eingeschränkte Rechte">
+              <span class="lock-status-badge readonly" title={t.readOnlyDesc}>
                 <Lock size={12} strokeWidth={2} />
-                <span>Schreibgeschützt</span>
+                <span>{t.readOnly}</span>
               </span>
             {:else if sessionPassword}
-              <span class="lock-status-badge unlocked" title="Datei ist entschlüsselt mit Rechten">
+              <span class="lock-status-badge unlocked" title={t.unlockedDesc}>
                 <Lock size={12} strokeWidth={2} />
-                <span>Entschlüsselt</span>
+                <span>{t.unlocked}</span>
               </span>
             {:else}
-              <span class="lock-status-badge locked" title="Datei ist geschützt">
+              <span class="lock-status-badge locked" title={t.protectedDesc}>
                 <Lock size={12} strokeWidth={2} />
-                <span>Geschützt</span>
+                <span>{t.protected}</span>
               </span>
             {/if}
           {/if}
         </div>
 
-        <div class="titlebar-actions">
+        <div class="titlebar-actions no-drag">
           {#if hasWorkspaceInput}
             <button
               type="button"
@@ -897,7 +921,7 @@
               aria-label="Open file (Command+O)"
             >
               <FolderOpen size={14} strokeWidth={1.5} aria-hidden="true" />
-              <span>Open…</span>
+              <span>{t.openFile}</span>
             </button>
             <button
               type="button"
@@ -906,9 +930,21 @@
               aria-label="Clear loaded files"
             >
               <X size={14} strokeWidth={1.5} aria-hidden="true" />
-              <span>Clear</span>
+              <span>{t.clearFiles}</span>
             </button>
           {/if}
+          <button
+            type="button"
+            class="ghost-btn"
+            onclick={() => {
+              settingsDialogOpen = true;
+            }}
+            aria-label={t.settings}
+            title={t.settings}
+          >
+            <Settings size={14} strokeWidth={1.5} aria-hidden="true" />
+            <span>{t.settings}</span>
+          </button>
         </div>
       </header>
 
@@ -2072,6 +2108,7 @@
   <StatusBar
     files={loadedFiles}
     {progress}
+    {lang}
     onCancel={() => {
       void cancelActiveOperation();
     }}
@@ -2081,6 +2118,7 @@
     open={paletteOpen}
     {activeTool}
     {theme}
+    {lang}
     onClose={() => {
       paletteOpen = false;
     }}
@@ -2093,8 +2131,12 @@
     onSelectTheme={(nextTheme) => {
       theme = nextTheme;
     }}
-    onOpenAbout={() => {
-      aboutDialogOpen = true;
+    onOpenSettings={() => {
+      settingsDialogOpen = true;
+    }}
+    onSelectLanguage={(nextLang) => {
+      lang = nextLang;
+      saveLanguage(nextLang);
     }}
   />
 
@@ -2108,12 +2150,12 @@
         <div class="pw-modal-header">
           <div class="pw-modal-title-row">
             <Lock size={18} strokeWidth={2} class="pw-modal-icon" />
-            <h2 class="pw-modal-title">Geschützte Datei</h2>
+            <h2 class="pw-modal-title">{t.passwordRequired}</h2>
           </div>
           <button
             type="button"
             class="pw-modal-close"
-            aria-label="Schließen"
+            aria-label={t.close}
             onclick={handlePasswordCancel}
           >
             <X size={16} />
@@ -2121,7 +2163,7 @@
         </div>
 
         <p class="pw-modal-desc">
-          Diese Datei ist geschützt. Bitte Passwort eingeben.
+          {t.passwordPrompt}
         </p>
 
         <form onsubmit={(e) => { e.preventDefault(); void handlePasswordSubmit(); }}>
@@ -2130,7 +2172,7 @@
             <input
               type="password"
               class="pw-modal-input"
-              placeholder="Passwort eingeben…"
+              placeholder={t.passwordPlaceholder}
               value={passwordPromptInput}
               oninput={(e) => {
                 passwordPromptInput = e.currentTarget.value;
@@ -2148,7 +2190,7 @@
 
           {#if passwordPromptAttempts >= 3}
             <div class="pw-modal-hint">
-              Möglicherweise handelt es sich um ein Owner-Passwort mit abweichenden Rechten.
+              {lang === 'de' ? 'Möglicherweise handelt es sich um ein Owner-Passwort mit abweichenden Rechten.' : 'This document might require an Owner password to grant edit permissions.'}
             </div>
           {/if}
 
@@ -2158,14 +2200,14 @@
               class="ghost-btn"
               onclick={handlePasswordCancel}
             >
-              Abbrechen
+              {t.cancel}
             </button>
             <button
               type="submit"
               class="primary-action-btn modal-submit"
               disabled={!passwordPromptInput.trim()}
             >
-              Entsperren
+              {t.unlockDocument}
             </button>
           </div>
         </form>
@@ -2173,42 +2215,21 @@
     </div>
   {/if}
 
-  {#if aboutDialogOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="pw-modal-backdrop" onclick={() => { aboutDialogOpen = false; }}>
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="pw-modal-card about-modal-card" onclick={(e) => e.stopPropagation()}>
-        <div class="about-modal-content">
-          <img src="/icon.png" alt="Sheaf Icon" class="about-icon" width="80" height="80" />
-          <h2 class="about-title">Sheaf</h2>
-          <span class="about-version">Version 0.1.0</span>
-          <p class="about-desc">
-            Fast, offline-first PDF workbench for macOS.
-          </p>
-          <div class="about-badges">
-            <span class="about-badge">100% Offline</span>
-            <span class="about-badge">No Telemetry</span>
-            <span class="about-badge">MIT / Apache 2.0</span>
-          </div>
-          <p class="about-note">
-            Built with Rust, Tauri 2, Svelte 5, lopdf, and PDFium.
-          </p>
-        </div>
-        <div class="pw-modal-actions" style="justify-content: center; margin-top: 16px;">
-          <button
-            type="button"
-            class="primary-action-btn"
-            style="min-width: 100px;"
-            onclick={() => { aboutDialogOpen = false; }}
-          >
-            Schließen
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
+  <SettingsModal
+    open={settingsDialogOpen}
+    {lang}
+    {theme}
+    onClose={() => {
+      settingsDialogOpen = false;
+    }}
+    onSelectLanguage={(nextLang) => {
+      lang = nextLang;
+      saveLanguage(nextLang);
+    }}
+    onSelectTheme={(nextTheme) => {
+      theme = nextTheme;
+    }}
+  />
 </div>
 
 <style>
@@ -2218,6 +2239,8 @@
     display: flex;
     flex-direction: column;
     background-color: var(--bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     color: var(--text);
   }
 
@@ -2232,7 +2255,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    background-color: var(--bg);
+    background-color: transparent;
   }
 
   .titlebar {
@@ -2243,6 +2266,15 @@
     justify-content: space-between;
     padding: 0 var(--space-4);
     border-bottom: 1px solid var(--border);
+    background-color: var(--sidebar-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    cursor: grab;
+    user-select: none;
+  }
+
+  .titlebar:active {
+    cursor: grabbing;
   }
 
   .titlebar-title {
@@ -2334,7 +2366,10 @@
     justify-content: space-between;
     padding: var(--space-6);
     background-color: var(--surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     border-left: 1px solid var(--border);
+    box-shadow: inset 1px 0 0 0 rgba(255, 255, 255, 0.08);
     overflow-y: auto;
   }
 
@@ -2670,8 +2705,9 @@
   .pw-modal-backdrop {
     position: fixed;
     inset: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background-color: rgba(0, 0, 0, 0.35);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2681,11 +2717,13 @@
   .pw-modal-card {
     width: 400px;
     max-width: 90vw;
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-surface);
+    background-color: var(--surface);
+    backdrop-filter: blur(36px) saturate(190%);
+    -webkit-backdrop-filter: blur(36px) saturate(190%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-card);
     padding: var(--space-4);
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+    box-shadow: var(--glass-glow), var(--shadow-floating);
   }
 
   .pw-modal-header {
@@ -2770,62 +2808,5 @@
 
   .modal-submit {
     padding: var(--space-2) var(--space-4);
-  }
-
-  .about-modal-card {
-    text-align: center;
-    padding: var(--space-5) var(--space-4);
-  }
-
-  .about-modal-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .about-icon {
-    border-radius: 18px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    margin-bottom: 4px;
-  }
-
-  .about-title {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-  }
-
-  .about-version {
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  .about-desc {
-    margin: 4px 0 0;
-    font-size: 13px;
-    color: var(--text);
-  }
-
-  .about-badges {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-  }
-
-  .about-badge {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background-color: var(--surface-muted);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-  }
-
-  .about-note {
-    margin: 8px 0 0;
-    font-size: 11px;
-    color: var(--text-muted);
   }
 </style>

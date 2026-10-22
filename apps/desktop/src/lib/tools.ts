@@ -1,3 +1,5 @@
+import type { Language } from './i18n';
+import { translations } from './i18n';
 import type { ToolId } from './types';
 
 export interface ToolMetadata {
@@ -10,83 +12,89 @@ export interface ToolMetadata {
   description: string;
 }
 
-export const TOOLS: ToolMetadata[] = [
-  {
-    id: 'merge',
-    label: 'Merge',
-    group: 'primary',
-    shortcut: '⌘1',
-    actionLabel: 'Merge PDFs',
-    emptyPrompt: 'Drop PDF files here to combine them in order',
-    description: 'Combine multiple PDF documents into a single file while preserving bookmarks.',
-  },
-  {
-    id: 'split',
-    label: 'Split',
-    group: 'primary',
-    shortcut: '⌘2',
-    actionLabel: 'Split PDF',
-    emptyPrompt: 'Drop a PDF file here to split pages or chapters',
-    description: 'Extract page ranges, split every N pages, or split by bookmark hierarchy.',
-  },
-  {
-    id: 'pages',
-    label: 'Pages',
-    group: 'primary',
-    shortcut: '⌘3',
-    actionLabel: 'Apply Page Changes',
-    emptyPrompt: 'Drop a PDF file here to rotate, delete, reorder, or extract pages',
-    description: 'Inspect page thumbnails to rotate, delete, reorder, or extract selected pages.',
-  },
-  {
-    id: 'compress',
-    label: 'Compress',
-    group: 'primary',
-    shortcut: '⌘4',
-    actionLabel: 'Compress PDF',
-    emptyPrompt: 'Drop a PDF file here to reduce its file size',
-    description: 'Optimize streams and resample embedded images with Low, Medium, or High presets.',
-  },
-  {
-    id: 'convert',
-    label: 'Convert',
-    group: 'primary',
-    shortcut: '⌘5',
-    actionLabel: 'Convert Document',
-    emptyPrompt: 'Drop a PDF, PNG/JPG images, or a Markdown (.md) file here to convert',
-    description: 'Convert between PDF, PNG/JPG images, and Markdown (.md) documents.',
-  },
-  {
-    id: 'watermark',
-    label: 'Overlay',
-    group: 'secondary',
-    shortcut: '⌘6',
-    actionLabel: 'Apply Overlay',
-    emptyPrompt: 'Drop a PDF file here to add a watermark or page numbers',
-    description: 'Stamp customizable text watermarks or page numbers with live preview.',
-  },
-  {
-    id: 'protect',
-    label: 'Protect',
-    group: 'secondary',
-    shortcut: '⌘7',
-    actionLabel: 'Protect PDF',
-    emptyPrompt: 'Drop a PDF file here to encrypt or unlock',
-    description: 'Add or remove password protection on local PDF documents.',
-  },
-  {
-    id: 'info',
-    label: 'Info & Metadaten',
-    group: 'secondary',
-    shortcut: '⌘8',
-    actionLabel: 'Metadaten speichern',
-    emptyPrompt: 'Drop a PDF file here to inspect and edit metadata or sanitize',
-    description: 'Inspect PDF structure, edit metadata fields and custom keys, or strip identifying metadata.',
-  },
-];
+export function getLocalizedTools(lang: Language = 'en'): ToolMetadata[] {
+  const t = translations[lang];
+  return [
+    {
+      id: 'merge',
+      label: t.merge,
+      group: 'primary',
+      shortcut: '⌘1',
+      actionLabel: lang === 'de' ? 'PDFs zusammenführen' : 'Merge PDFs',
+      emptyPrompt: lang === 'de' ? 'PDF-Dateien hier ablegen, um sie in Reihenfolge zu verbinden' : 'Drop PDF files here to combine them in order',
+      description: t.mergeDesc,
+    },
+    {
+      id: 'split',
+      label: t.split,
+      group: 'primary',
+      shortcut: '⌘2',
+      actionLabel: lang === 'de' ? 'PDF teilen' : 'Split PDF',
+      emptyPrompt: lang === 'de' ? 'PDF-Datei hier ablegen, um Seiten oder Kapitel zu trennen' : 'Drop a PDF file here to split pages or chapters',
+      description: t.splitDesc,
+    },
+    {
+      id: 'pages',
+      label: t.pages,
+      group: 'primary',
+      shortcut: '⌘3',
+      actionLabel: lang === 'de' ? 'Seitenänderungen anwenden' : 'Apply Page Changes',
+      emptyPrompt: lang === 'de' ? 'PDF-Datei hier ablegen, um Seiten zu drehen, löschen oder zu ordnen' : 'Drop a PDF file here to rotate, delete, reorder, or extract pages',
+      description: t.pagesDesc,
+    },
+    {
+      id: 'compress',
+      label: t.compress,
+      group: 'primary',
+      shortcut: '⌘4',
+      actionLabel: lang === 'de' ? 'PDF komprimieren' : 'Compress PDF',
+      emptyPrompt: lang === 'de' ? 'PDF-Datei hier ablegen, um Dateigröße zu reduzieren' : 'Drop a PDF file here to reduce its file size',
+      description: t.compressDesc,
+    },
+    {
+      id: 'convert',
+      label: t.convert,
+      group: 'primary',
+      shortcut: '⌘5',
+      actionLabel: lang === 'de' ? 'Dokument konvertieren' : 'Convert Document',
+      emptyPrompt: lang === 'de' ? 'PDF, PNG/JPG-Bilder oder Markdown-Datei hier ablegen' : 'Drop a PDF, PNG/JPG images, or Markdown file here to convert',
+      description: t.convertDesc,
+    },
+    {
+      id: 'watermark',
+      label: t.watermark,
+      group: 'secondary',
+      shortcut: '⌘6',
+      actionLabel: lang === 'de' ? 'Wasserzeichen anwenden' : 'Apply Watermark',
+      emptyPrompt: lang === 'de' ? 'PDF-Datei hier ablegen, um ein Wasserzeichen hinzuzufügen' : 'Drop a PDF file here to add a watermark or page numbers',
+      description: t.watermarkDesc,
+    },
+    {
+      id: 'protect',
+      label: t.protect,
+      group: 'secondary',
+      shortcut: '⌘7',
+      actionLabel: lang === 'de' ? 'PDF schützen' : 'Protect PDF',
+      emptyPrompt: lang === 'de' ? 'PDF-Datei hier ablegen, um sie zu verschlüsseln oder zu entsperren' : 'Drop a PDF file here to encrypt or unlock',
+      description: t.protectDesc,
+    },
+    {
+      id: 'info',
+      label: lang === 'de' ? 'Info & Metadaten' : 'Info & Metadata',
+      group: 'secondary',
+      shortcut: '⌘8',
+      actionLabel: lang === 'de' ? 'Metadaten speichern' : 'Save Metadata',
+      emptyPrompt: lang === 'de' ? 'PDF-Datei hier ablegen, um Metadaten zu prüfen oder zu bereinigen' : 'Drop a PDF file here to inspect and edit metadata or sanitize',
+      description: t.infoDesc,
+    },
+  ];
+}
 
-export function getToolById(id: ToolId): ToolMetadata {
-  return TOOLS.find((t) => t.id === id) ?? TOOLS[0];
+export const TOOLS: ToolMetadata[] = getLocalizedTools('en');
+
+export function getToolById(id: ToolId, lang: Language = 'en'): ToolMetadata {
+  const list = getLocalizedTools(lang);
+  return list.find((t) => t.id === id) ?? list[0];
 }
 
 export function formatBytes(bytes: number): string {

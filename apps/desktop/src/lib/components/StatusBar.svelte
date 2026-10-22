@@ -1,30 +1,40 @@
 <script lang="ts">
   import { basename, formatBytes } from '../tools';
   import type { FileInfo, ProgressEventPayload } from '../types';
+  import type { Language } from '../i18n';
+  import { translations } from '../i18n';
 
   interface Props {
     files: FileInfo[];
     progress: ProgressEventPayload | null;
+    lang?: Language;
     onCancel: () => void;
   }
 
-  let { files, progress, onCancel }: Props = $props();
+  let { files, progress, lang = 'en', onCancel }: Props = $props();
+
+  let t = $derived(translations[lang]);
 
   let statusText = $derived.by(() => {
     if (files.length === 0) {
-      return 'No file selected · 100% Offline';
+      return lang === 'de'
+        ? 'Keine Datei ausgewählt · 100 % Offline'
+        : 'No file selected · 100% Offline';
     }
     if (files.length === 1) {
       const f = files[0];
+      const pageWord = f.pages === 1 ? (lang === 'de' ? 'Seite' : 'page') : (lang === 'de' ? 'Seiten' : 'pages');
       const pagesLabel =
         f.pages === null
-          ? 'Encrypted'
-          : `${f.pages} ${f.pages === 1 ? 'page' : 'pages'}`;
+          ? (lang === 'de' ? 'Geschützt' : 'Encrypted')
+          : `${f.pages} ${pageWord}`;
       return `${basename(f.path)} · ${pagesLabel} · ${formatBytes(f.size_bytes)}`;
     }
     const totalPages = files.reduce((acc, f) => acc + (f.pages ?? 0), 0);
     const totalBytes = files.reduce((acc, f) => acc + f.size_bytes, 0);
-    return `${files.length} files · ${totalPages} pages · ${formatBytes(totalBytes)}`;
+    const filesWord = files.length === 1 ? (lang === 'de' ? 'Datei' : 'file') : (lang === 'de' ? 'Dateien' : 'files');
+    const pagesWord = totalPages === 1 ? (lang === 'de' ? 'Seite' : 'page') : (lang === 'de' ? 'Seiten' : 'pages');
+    return `${files.length} ${filesWord} · ${totalPages} ${pagesWord} · ${formatBytes(totalBytes)}`;
   });
 
   let progressPercent = $derived.by(() => {
@@ -33,7 +43,7 @@
   });
 </script>
 
-<footer class="statusbar" role="status" aria-live="polite">
+<footer class="statusbar no-drag" role="status" aria-live="polite">
   {#if progress}
     <div class="progress-track" aria-hidden="true">
       <div class="progress-fill" style={`width: ${progressPercent}%`}></div>
@@ -50,10 +60,10 @@
         {progress.op} ({progress.done}/{progress.total})
       </span>
       <button type="button" class="cancel-btn" onclick={onCancel}>
-        Cancel
+        {t.cancel}
       </button>
     {:else}
-      <span class="shortcut-hint">⌘K Command Palette · ⌘O Open</span>
+      <span class="shortcut-hint">{lang === 'de' ? '⌘K Werkzeugsuche · ⌘O Öffnen · ⌘, Einstellungen' : '⌘K Command Palette · ⌘O Open · ⌘, Settings'}</span>
     {/if}
   </div>
 </footer>
@@ -67,7 +77,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--space-4);
-    background-color: var(--surface);
+    background-color: var(--sidebar-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     border-top: 1px solid var(--border);
     color: var(--text-muted);
     font-size: 12px;
@@ -97,22 +109,38 @@
   }
 
   .status-summary {
-    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .shortcut-hint {
     font-size: 11px;
     color: var(--text-muted);
+    opacity: 0.8;
+  }
+
+  .progress-text {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
   }
 
   .cancel-btn {
-    padding: 1px var(--space-2);
-    border: 1px solid var(--danger);
-    border-radius: 4px;
-    background-color: var(--danger-subtle);
-    color: var(--danger);
+    border: 1px solid var(--border);
+    background-color: var(--surface);
+    color: var(--text-muted);
     font-size: 11px;
-    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: var(--radius-control);
     cursor: pointer;
+    transition:
+      border-color var(--transition-fast),
+      color var(--transition-fast);
+  }
+
+  .cancel-btn:hover {
+    border-color: var(--danger);
+    color: var(--danger);
   }
 </style>

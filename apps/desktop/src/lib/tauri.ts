@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type {
   CommandErrorPayload,
@@ -31,6 +32,22 @@ import type {
 
 export function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+export function startWindowDrag(event: MouseEvent | PointerEvent): void {
+  if (event.button !== 0) return;
+  const target = event.target as HTMLElement | null;
+  if (!target) return;
+  if (target.closest('button, input, select, textarea, a, [role="button"], .no-drag')) {
+    return;
+  }
+  if (!isTauriRuntime()) return;
+  try {
+    const win = getCurrentWindow();
+    void win.startDragging();
+  } catch (err) {
+    // Non-tauri or mock environment
+  }
 }
 
 export async function pickPdfFiles(multiple = true): Promise<string[]> {
