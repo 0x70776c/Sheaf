@@ -282,10 +282,32 @@ sheaf verify out/*.pdf --deep --json
 ---
 
 ### 12. `sheaf capabilities`
-Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`).
+Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`, `pdfium`).
 
 ```bash
 sheaf capabilities --json
+```
+
+---
+
+### 13. `sheaf completions`
+Generate shell completion scripts for `bash`, `zsh`, or `fish`.
+
+```bash
+# Generate and load completions for zsh
+source <(sheaf completions zsh)
+
+# Or save to your zsh completion directory
+sheaf completions zsh > ~/.zfunc/_sheaf
+```
+
+---
+
+### 14. `sheaf docs`
+Generate or export CLI reference documentation.
+
+```bash
+sheaf docs
 ```
 
 ---

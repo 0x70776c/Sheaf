@@ -50,10 +50,10 @@ pub use ops::pages::{
 };
 pub use ops::protect::{ProtectOptions, ProtectReport, UnlockOptions, protect, unlock};
 pub use ops::render::{
-    DEFAULT_RENDER_DPI, DEFAULT_THUMBNAIL_WIDTH_PX, RenderOptions, RenderReport, RenderScale,
-    RenderedPageOutput, default_thumbnail_cache_dir, is_pdfium_available, render_page,
-    render_pdf_bytes_page, render_thumbnails, render_thumbnails_with_options, render_with_options,
-    thumbnail_cache_key,
+    DEFAULT_RENDER_DPI, DEFAULT_THUMBNAIL_WIDTH_PX, PdfiumStatus, RenderOptions, RenderReport,
+    RenderScale, RenderedPageOutput, default_thumbnail_cache_dir, get_pdfium_status,
+    is_pdfium_available, render_page, render_pdf_bytes_page, render_thumbnails,
+    render_thumbnails_with_options, render_with_options, thumbnail_cache_key,
 };
 pub use ops::split::{PageSelection, SplitMode, SplitOptions, SplitOutput, SplitReport, split};
 pub use ops::verify::{VerifyFileResult, VerifyOptions, VerifyReport, verify};

@@ -67,6 +67,17 @@ pub struct CommandCapability {
 pub struct ToolAvailability {
     /// Whether `qpdf` is available in `PATH` or standard Homebrew locations.
     pub qpdf: bool,
+    /// PDFium library availability and resolved path.
+    pub pdfium: PdfiumToolStatus,
+}
+
+/// PDFium tool availability status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PdfiumToolStatus {
+    /// Whether PDFium library was found and initialized.
+    pub found: bool,
+    /// Library path if resolved.
+    pub path: Option<String>,
 }
 
 /// Report returned by [`capabilities`].
@@ -74,6 +85,8 @@ pub struct ToolAvailability {
 pub struct CapabilitiesReport {
     /// Package version of Sheaf.
     pub version: &'static str,
+    /// Git commit short hash (or "unknown").
+    pub commit: String,
     /// JSON envelope schema version.
     pub schema: u32,
     /// Global arguments accepted by every command (not repeated per command).
@@ -160,8 +173,11 @@ pub fn capabilities() -> CapabilitiesReport {
     })
     .collect();
 
+    let pdfium_stat = crate::ops::render::get_pdfium_status();
+
     CapabilitiesReport {
         version: env!("CARGO_PKG_VERSION"),
+        commit: "unknown".to_string(),
         schema: SCHEMA_VERSION,
         global_args: Vec::new(),
         commands,
@@ -169,6 +185,10 @@ pub fn capabilities() -> CapabilitiesReport {
         error_codes: default_error_codes(),
         tools: ToolAvailability {
             qpdf: find_qpdf().is_some(),
+            pdfium: PdfiumToolStatus {
+                found: pdfium_stat.found,
+                path: pdfium_stat.path,
+            },
         },
     }
 }

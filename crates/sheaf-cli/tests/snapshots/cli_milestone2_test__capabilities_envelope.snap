@@ -1432,8 +1432,31 @@ expression: cap_val
         "help": "Describe supported commands, flags, exit codes, and external tools",
         "name": "capabilities",
         "status": "stable"
+      },
+      {
+        "args": [
+          {
+            "help": "Target shell to generate completions for (bash, zsh, fish, elvish, powershell)",
+            "kind": "positional",
+            "name": "shell",
+            "possible_values": [
+              "bash",
+              "zsh",
+              "fish",
+              "elvish",
+              "powershell"
+            ],
+            "required": true,
+            "secret": false,
+            "value_name": "SHELL"
+          }
+        ],
+        "help": "Generate shell completion scripts for bash, zsh, fish, elvish, or powershell",
+        "name": "completions",
+        "status": "stable"
       }
     ],
+    "commit": "[commit]",
     "error_codes": {
       "cancelled": 130,
       "empty_selection": 2,
@@ -1519,6 +1542,10 @@ expression: cap_val
     ],
     "schema": 1,
     "tools": {
+      "pdfium": {
+        "found": true,
+        "path": "[pdfium_path]"
+      },
       "qpdf": true
     },
     "version": "0.1.0"
