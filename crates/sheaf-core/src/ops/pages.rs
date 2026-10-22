@@ -8,12 +8,15 @@ use serde::Serialize;
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf};
 use crate::ops::split::{build_subset_document, sanitize_stem};
 use crate::{PageSelection, Progress, SheafError};
 
 /// Options for page-level operations (`rotate`, `delete`, `reorder`, `extract`).
 #[derive(Debug, Clone, Default)]
 pub struct PageOpOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// Target output PDF file path. If empty, defaults to `{stem}_{suffix}.pdf` in the source directory.
     pub out: Option<PathBuf>,
     /// Overwrite existing output file if `true`.
@@ -40,6 +43,9 @@ pub struct PagesReport {
     /// Normalized rotation delta (`90`, `180`, `270`) when `action == "rotate"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub degrees: Option<i32>,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Normalizes a rotation angle in degrees to `90`, `180`, or `270`.
@@ -102,7 +108,7 @@ pub fn rotate_pages(
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
     let delta = normalize_rotation_degrees(degrees)?;
-    let (mut doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (mut doc, pages_map, total_pages, was_encrypted) = load_source_pdf(src, opts, p)?;
 
     let target_pages = match selection {
         Some(sel) => validate_and_dedup_selection(sel, total_pages)?,
@@ -126,6 +132,7 @@ pub fn rotate_pages(
             output_pages: total_pages,
             pages_affected: target_pages,
             degrees: Some(delta),
+            was_encrypted,
         });
     }
 
@@ -163,6 +170,7 @@ pub fn rotate_pages(
         output_pages: total_pages,
         pages_affected: target_pages,
         degrees: Some(delta),
+        was_encrypted,
     })
 }
 
@@ -193,7 +201,7 @@ pub fn delete_pages(
     opts: &PageOpOptions,
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
-    let (doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (doc, pages_map, total_pages, was_encrypted) = load_source_pdf(src, opts, p)?;
     let to_delete = validate_and_dedup_selection(selection, total_pages)?;
     let delete_set: HashSet<u32> = to_delete.iter().copied().collect();
 
@@ -224,6 +232,7 @@ pub fn delete_pages(
             output_pages,
             pages_affected: to_delete,
             degrees: None,
+            was_encrypted,
         });
     }
 
@@ -248,6 +257,7 @@ pub fn delete_pages(
         output_pages,
         pages_affected: to_delete,
         degrees: None,
+        was_encrypted,
     })
 }
 
@@ -281,7 +291,7 @@ pub fn reorder_pages(
     opts: &PageOpOptions,
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
-    let (doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (doc, pages_map, total_pages, was_encrypted) = load_source_pdf(src, opts, p)?;
     let page_sequence = validate_sequence_selection(order, total_pages)?;
 
     let out_path = resolve_output_path(src, opts.out.as_deref(), "reordered");
@@ -301,6 +311,7 @@ pub fn reorder_pages(
             output_pages,
             pages_affected: page_sequence,
             degrees: None,
+            was_encrypted,
         });
     }
 
@@ -325,6 +336,7 @@ pub fn reorder_pages(
         output_pages,
         pages_affected: page_sequence,
         degrees: None,
+        was_encrypted,
     })
 }
 
@@ -355,7 +367,7 @@ pub fn extract_pages(
     opts: &PageOpOptions,
     p: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
-    let (doc, pages_map, total_pages) = load_source_pdf(src, p)?;
+    let (doc, pages_map, total_pages, was_encrypted) = load_source_pdf(src, opts, p)?;
     let extracted_sequence = validate_sequence_selection(selection, total_pages)?;
 
     let out_path = resolve_output_path(src, opts.out.as_deref(), "extracted");
@@ -375,6 +387,7 @@ pub fn extract_pages(
             output_pages,
             pages_affected: extracted_sequence,
             degrees: None,
+            was_encrypted,
         });
     }
 
@@ -399,27 +412,21 @@ pub fn extract_pages(
         output_pages,
         pages_affected: extracted_sequence,
         degrees: None,
+        was_encrypted,
     })
 }
 
 fn load_source_pdf(
     src: &Path,
+    opts: &PageOpOptions,
     p: &dyn Progress,
-) -> Result<(Document, BTreeMap<u32, ObjectId>, u32), SheafError> {
+) -> Result<(Document, BTreeMap<u32, ObjectId>, u32, bool), SheafError> {
     if p.is_cancelled() {
         return Err(SheafError::Cancelled);
     }
-    if !src.exists() {
-        return Err(SheafError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("File not found: {}", src.display()),
-        )));
-    }
-
-    let doc = Document::load(src).map_err(|e| SheafError::from_lopdf_with_path(e, src))?;
-    if doc.is_encrypted() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded = load_pdf(src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
+    let doc = loaded.doc;
 
     let pages_map = doc.get_pages();
     if pages_map.is_empty() {
@@ -429,7 +436,7 @@ fn load_source_pdf(
         )));
     }
     let total_pages = u32::try_from(pages_map.len()).unwrap_or(u32::MAX);
-    Ok((doc, pages_map, total_pages))
+    Ok((doc, pages_map, total_pages, was_encrypted))
 }
 
 fn resolve_output_path(src: &Path, configured: Option<&Path>, suffix: &str) -> PathBuf {

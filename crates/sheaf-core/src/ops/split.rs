@@ -9,6 +9,7 @@ use serde::Serialize;
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf};
 use crate::{Progress, SheafError};
 
 /// A validated selection of 1-based inclusive page ranges.
@@ -193,6 +194,8 @@ impl SplitMode {
 /// Options for [`split`].
 #[derive(Debug, Clone)]
 pub struct SplitOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// Split mode.
     pub mode: SplitMode,
     /// Target directory for generated PDF files.
@@ -230,6 +233,9 @@ pub struct SplitReport {
     /// Non-fatal warnings produced during splitting (e.g. skipped bookmarks without valid target).
     #[serde(skip)]
     pub warnings: Vec<String>,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 struct PlannedOutput {
@@ -259,10 +265,11 @@ struct PlannedOutput {
 ///
 /// ```no_run
 /// use std::path::{Path, PathBuf};
-/// use sheaf_core::{PageSelection, SplitMode, SplitOptions, split, NoProgress};
+/// use sheaf_core::{LoadOptions, NoProgress, PageSelection, SplitMode, SplitOptions, split};
 ///
 /// let sel = PageSelection::parse("1-2", 2).unwrap();
 /// let opts = SplitOptions {
+///     load: LoadOptions::none(),
 ///     mode: SplitMode::Ranges { selection: sel, combine: false },
 ///     out_dir: PathBuf::from("out"),
 ///     force: false,
@@ -276,17 +283,9 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
         return Err(SheafError::Cancelled);
     }
 
-    if !src.exists() {
-        return Err(SheafError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("File not found: {}", src.display()),
-        )));
-    }
-
-    let doc = Document::load(src).map_err(|e| SheafError::from_lopdf_with_path(e, src))?;
-    if doc.is_encrypted() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded = load_pdf(src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
+    let doc = loaded.doc;
 
     let pages_map = doc.get_pages();
     if pages_map.is_empty() {
@@ -328,6 +327,7 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
             mode: opts.mode.as_str(),
             outputs: planned.into_iter().map(|item| item.output).collect(),
             warnings,
+            was_encrypted,
         });
     }
 
@@ -353,6 +353,7 @@ pub fn split(src: &Path, opts: &SplitOptions, p: &dyn Progress) -> Result<SplitR
         mode: opts.mode.as_str(),
         outputs,
         warnings,
+        was_encrypted,
     })
 }
 

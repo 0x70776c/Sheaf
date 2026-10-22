@@ -12,14 +12,22 @@ impl Command for MergeArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
+        let mut resolver = crate::password::PasswordResolver::new();
+        let pw = resolver.resolve_open_password(&self.password_opts)?;
         let opts = MergeOptions {
+            load: sheaf_core::LoadOptions { password: pw },
             force: ctx.global.force,
             dry_run: ctx.global.dry_run,
         };
         let report = merge_with_options(&self.inputs, &self.out, &opts, &ctx.progress)?;
+        let mut warnings = resolver.warnings;
+        if report.was_encrypted {
+            warnings
+                .push("Eingabe war verschlüsselt, Ausgabe ist nicht verschlüsselt.".to_string());
+        }
         Ok(Outcome {
             report,
-            warnings: Vec::new(),
+            warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })

@@ -9,8 +9,8 @@ use lopdf::{
     dictionary,
 };
 use sheaf_core::{
-    CompressOptions, CompressPreset, NoProgress, Progress, SheafError, compress,
-    compress_with_options,
+    CompressOptions, CompressPreset, LoadOptions, NoProgress, Progress, SheafError, compress,
+    compress_with_options, load_pdf,
 };
 
 struct CancelledProgress;
@@ -33,7 +33,9 @@ fn fixtures_dir() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]
@@ -69,8 +71,8 @@ fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
 fn ensure_photo_fixture() -> PathBuf {
     let path = fixtures_dir().join("fixture_photo.pdf");
     if path.exists()
-        && let Ok(doc) = Document::load(&path)
-        && doc.get_pages().len() == 2
+        && let Ok(loaded) = load_pdf(&path, &LoadOptions::none())
+        && loaded.doc.get_pages().len() == 2
     {
         return path;
     }
@@ -283,6 +285,7 @@ fn compress_presets_order_and_grayscale_conversion() {
     let rep_high = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::High,
             grayscale: true,
             out: Some(out_high.clone()),
@@ -351,6 +354,7 @@ fn compress_dry_run_and_error_cases() {
     let dry_rep = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::Medium,
             grayscale: false,
             out: Some(dry_out.clone()),
@@ -369,6 +373,7 @@ fn compress_dry_run_and_error_cases() {
     let err = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::Medium,
             grayscale: false,
             out: Some(existing),
@@ -399,6 +404,7 @@ fn compress_dry_run_and_error_cases() {
     let cancel_err = compress_with_options(
         &photo_pdf,
         &CompressOptions {
+            load: LoadOptions::none(),
             preset: CompressPreset::Medium,
             grayscale: false,
             out: Some(cancel_out),

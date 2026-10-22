@@ -13,8 +13,13 @@ impl Command for CompressArgs {
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Outcome<Self::Report>, SheafError> {
+        let mut resolver = crate::password::PasswordResolver::new();
+        let pw = resolver.resolve_open_password(&self.password_opts)?;
+        let load_opts = sheaf_core::LoadOptions { password: pw };
+
         let preset = CompressPreset::parse(&self.preset)?;
         let opts = CompressOptions {
+            load: load_opts,
             preset,
             grayscale: self.grayscale,
             out: self.out.clone(),
@@ -23,7 +28,11 @@ impl Command for CompressArgs {
         };
 
         let report = compress_with_options(&self.input, &opts, &ctx.progress)?;
-        let mut warnings = Vec::new();
+        let mut warnings = resolver.warnings;
+        if report.was_encrypted {
+            warnings
+                .push("Eingabe war verschlüsselt, Ausgabe ist nicht verschlüsselt.".to_string());
+        }
         if report.already_optimal {
             warnings.push(
                 "File is already optimal (compressed output was not smaller than original)."

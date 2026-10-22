@@ -8,6 +8,8 @@
     RotateCw,
     RotateCcw,
     ArrowUpDown,
+    Lock,
+    LockOpen,
   } from '@lucide/svelte';
   import Sidebar from './lib/components/Sidebar.svelte';
   import DropZone from './lib/components/DropZone.svelte';
@@ -39,10 +41,12 @@
     runCompressCommand,
     runConvertCommand,
     runMergeCommand,
+    runNumberCommand,
     runPagesCommand,
     runProtectCommand,
     runSplitCommand,
     runWatermarkCommand,
+    previewOverlayCommand,
   } from './lib/tauri';
   import type {
     CommandErrorPayload,
@@ -51,6 +55,8 @@
     ConvertPageSizeUi,
     FileInfo,
     ImageFormatUi,
+    NumberPositionUi,
+    OverlayModeUi,
     PagesActionUi,
     ProgressEventPayload,
     ProtectActionUi,
@@ -106,7 +112,8 @@
   let convertImagePaths = $state<string[]>([]);
   let convertMarkdownPath = $state<string | null>(null);
 
-  // Watermark options
+  // Watermark & Number (Overlay) options
+  let overlayMode = $state<OverlayModeUi>('watermark');
   let watermarkText = $state('CONFIDENTIAL');
   let watermarkPosition = $state<WatermarkPositionUi>('diagonal');
   let watermarkFontSize = $state<number>(48);
@@ -115,13 +122,41 @@
   let watermarkPagesSpec = $state('');
   let watermarkOutPath = $state<string | null>(null);
 
+  // Number options
+  let numberFormat = $state('{n} / {total}');
+  let numberPosition = $state<NumberPositionUi>('bottom-center');
+  let numberStart = $state<number>(1);
+  let numberFontSize = $state<number>(11);
+  let numberOpacity = $state<number>(1.0);
+  let numberColor = $state('#111827');
+  let numberMargin = $state<number>(28);
+  let numberPagesSpec = $state('');
+  let numberOutPath = $state<string | null>(null);
+
+  // Overlay Live Preview state
+  let overlayPreviewItem = $state<ThumbnailItem | null>(null);
+  let overlayPreviewLoading = $state(false);
+  let overlayPreviewError = $state<string | null>(null);
+  let previewReqSeq = 0;
+
   // Protect options
   let protectAction = $state<ProtectActionUi>('protect');
+  let protectEnableProtection = $state(true);
   let protectPassword = $state('');
+  let protectPasswordConfirm = $state('');
   let protectOwnerPassword = $state('');
   let protectAllowPrint = $state(true);
   let protectAllowCopy = $state(true);
+  let protectAllowModify = $state(true);
   let protectOutPath = $state<string | null>(null);
+
+  // Transient Session Password & Prompt State (never saved to localStorage / disk)
+  let sessionPassword = $state<string | null>(null);
+  let passwordDialogOpen = $state(false);
+  let passwordPromptInput = $state('');
+  let passwordPromptError = $state<string | null>(null);
+  let passwordPromptAttempts = $state(0);
+  let pendingEncryptedPaths = $state<string[]>([]);
 
   // Execution & feedback state
   let isRunning = $state(false);
@@ -132,6 +167,13 @@
   let currentToolMeta = $derived(getToolById(activeTool));
   let primaryFile = $derived<FileInfo | undefined>(loadedFiles[0]);
   let primaryTotalPages = $derived(primaryFile?.pages ?? 0);
+  let isReadOnly = $derived(
+    Boolean(
+      primaryFile?.encrypted &&
+        primaryFile.encryption?.permissions &&
+        (!primaryFile.encryption.permissions.modify || !primaryFile.encryption.permissions.copy),
+    ),
+  );
   let hasWorkspaceInput = $derived(
     loadedFiles.length > 0 ||
       (activeTool === 'convert' &&
@@ -147,8 +189,69 @@
     }
   });
 
+  $effect(() => {
+    if (activeTool !== 'watermark' || !primaryFile || primaryFile.encrypted) {
+      overlayPreviewItem = null;
+      return;
+    }
+    const currentFile = primaryFile.path;
+    const total = primaryTotalPages;
+    const currentMode = overlayMode;
+    const wmText = watermarkText;
+    const wmPos = watermarkPosition;
+    const wmSize = watermarkFontSize;
+    const wmOp = watermarkOpacity;
+    const wmCol = watermarkColor;
+    const numFmt = numberFormat;
+    const numPos = numberPosition;
+    const numStart = numberStart;
+    const numSize = numberFontSize;
+    const numOp = numberOpacity;
+    const numCol = numberColor;
+    const numMargin = numberMargin;
+
+    const targetPage = selectedPages.size > 0 ? Math.min(...selectedPages) : 1;
+
+    const reqId = ++previewReqSeq;
+    overlayPreviewLoading = true;
+    overlayPreviewError = null;
+
+    const timer = setTimeout(async () => {
+      try {
+        const item = await previewOverlayCommand({
+          input: currentFile,
+          page: targetPage,
+          totalPages: total,
+          mode: currentMode,
+          text: currentMode === 'number' ? numFmt : wmText,
+          position: currentMode === 'number' ? numPos : wmPos,
+          start: numStart,
+          fontSize: currentMode === 'number' ? numSize : wmSize,
+          opacity: currentMode === 'number' ? numOp : wmOp,
+          color: currentMode === 'number' ? numCol : wmCol,
+          margin: currentMode === 'number' ? numMargin : 36.0,
+          widthPx: 260,
+        });
+        if (reqId === previewReqSeq) {
+          overlayPreviewItem = item;
+          overlayPreviewLoading = false;
+        }
+      } catch (err) {
+        if (reqId === previewReqSeq) {
+          overlayPreviewError = (err as Error)?.message ?? 'Preview unavailable';
+          overlayPreviewLoading = false;
+        }
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  });
+
   async function loadThumbnailsUpTo(file: FileInfo, maxPage: number) {
-    if (file.encrypted || !file.pages || file.pages <= 0) return;
+    if (!file.pages || file.pages <= 0) return;
+    if (file.encrypted && !sessionPassword) return;
     const limit = Math.min(file.pages, maxPage);
     const missing: number[] = [];
     for (let p = 1; p <= limit; p++) {
@@ -160,7 +263,7 @@
 
     loadingThumbnails = true;
     try {
-      const items = await fetchThumbnails(file.path, missing, 160);
+      const items = await fetchThumbnails(file.path, missing, 160, sessionPassword);
       const next = new Map(thumbnailsMap);
       for (const item of items) {
         next.set(item.page, item);
@@ -218,14 +321,24 @@
     }
 
     try {
-      const report = await openPdf(pdfPaths);
+      const report = await openPdf(pdfPaths, sessionPassword);
       if (append && activeTool === 'merge') {
         loadedFiles = [...loadedFiles, ...report.files];
       } else {
+        const first = report.files[0];
+        if (first?.encrypted && !sessionPassword) {
+          // Encrypted file opened without password -> trigger modal prompt
+          pendingEncryptedPaths = pdfPaths;
+          passwordDialogOpen = true;
+          passwordPromptInput = '';
+          passwordPromptError = null;
+          passwordPromptAttempts = 0;
+          return;
+        }
+
         loadedFiles = report.files;
         thumbnailsMap = new Map();
         selectedPages = new Set();
-        const first = report.files[0];
         if (first) {
           const total = first.pages ?? 1;
           splitRangesInput = total > 1 ? `1-${Math.min(3, total)}` : '1';
@@ -239,8 +352,57 @@
         }
       }
     } catch (err) {
-      errorBanner = extractErrorMessage(err);
+      const errMsg = extractErrorMessage(err);
+      if (errMsg.code === 'encrypted' || errMsg.code === 'wrong_password') {
+        pendingEncryptedPaths = pdfPaths;
+        passwordDialogOpen = true;
+        passwordPromptInput = '';
+        passwordPromptError = null;
+        passwordPromptAttempts = 0;
+      } else {
+        errorBanner = errMsg;
+      }
     }
+  }
+
+  async function handlePasswordSubmit() {
+    if (!passwordPromptInput.trim() || pendingEncryptedPaths.length === 0) return;
+    try {
+      const pw = passwordPromptInput;
+      const report = await openPdf(pendingEncryptedPaths, pw);
+      sessionPassword = pw;
+      passwordDialogOpen = false;
+      passwordPromptError = null;
+      passwordPromptAttempts = 0;
+
+      loadedFiles = report.files;
+      thumbnailsMap = new Map();
+      selectedPages = new Set();
+      const first = report.files[0];
+      if (first) {
+        const total = first.pages ?? 1;
+        splitRangesInput = total > 1 ? `1-${Math.min(3, total)}` : '1';
+        pagesSpecInput = '';
+        convertPagesSpec = '';
+        watermarkPagesSpec = '';
+        if (first.encrypted) {
+          protectAction = 'unlock';
+        }
+        await loadThumbnailsUpTo(first, 20);
+      }
+    } catch (err) {
+      passwordPromptAttempts += 1;
+      passwordPromptInput = '';
+      passwordPromptError = 'Falsches Passwort. Bitte erneut versuchen.';
+    }
+  }
+
+  function handlePasswordCancel() {
+    passwordDialogOpen = false;
+    pendingEncryptedPaths = [];
+    passwordPromptInput = '';
+    passwordPromptError = null;
+    passwordPromptAttempts = 0;
   }
 
   async function handleChooseFiles(append = false) {
@@ -274,6 +436,9 @@
     thumbnailsMap = new Map();
     selectedPages = new Set();
     errorBanner = null;
+    sessionPassword = null;
+    passwordDialogOpen = false;
+    pendingEncryptedPaths = [];
   }
 
   function handleGridSelectionChange(nextSelected: Set<number>) {
@@ -289,13 +454,17 @@
     ) {
       convertPagesSpec = formatted;
     } else if (activeTool === 'watermark') {
-      watermarkPagesSpec = formatted;
+      if (overlayMode === 'number') {
+        numberPagesSpec = formatted;
+      } else {
+        watermarkPagesSpec = formatted;
+      }
     }
   }
 
   function handleRangesInputEdit(
     value: string,
-    target: 'split' | 'pages' | 'convert' | 'watermark',
+    target: 'split' | 'pages' | 'convert' | 'watermark' | 'number',
   ) {
     if (target === 'split') {
       splitRangesInput = value;
@@ -303,6 +472,8 @@
       pagesSpecInput = value;
     } else if (target === 'convert') {
       convertPagesSpec = value;
+    } else if (target === 'number') {
+      numberPagesSpec = value;
     } else {
       watermarkPagesSpec = value;
     }
@@ -462,23 +633,74 @@
           };
         }
       } else if (activeTool === 'watermark' && primaryFile) {
-        const rep = await runWatermarkCommand({
-          input: primaryFile.path,
-          text: watermarkText,
-          position: watermarkPosition,
-          fontSize: watermarkFontSize,
-          opacity: watermarkOpacity,
-          color: watermarkColor,
-          pages: watermarkPagesSpec.trim() || null,
-          out: watermarkOutPath,
-          force: true,
-        });
-        toastNotice = {
-          title: `Watermarked ${rep.pages_watermarked.length} ${rep.pages_watermarked.length === 1 ? 'page' : 'pages'}`,
-          subtitle: basename(rep.output),
-          targetPath: rep.output,
-        };
+        if (overlayMode === 'number') {
+          const rep = await runNumberCommand({
+            input: primaryFile.path,
+            format: numberFormat,
+            position: numberPosition,
+            start: numberStart,
+            fontSize: numberFontSize,
+            opacity: numberOpacity,
+            color: numberColor,
+            margin: numberMargin,
+            pages: numberPagesSpec.trim() || null,
+            out: numberOutPath,
+            force: true,
+          });
+          toastNotice = {
+            title: `Numbered ${rep.pages_numbered.length} ${rep.pages_numbered.length === 1 ? 'page' : 'pages'}`,
+            subtitle: basename(rep.output),
+            targetPath: rep.output,
+          };
+        } else {
+          const rep = await runWatermarkCommand({
+            input: primaryFile.path,
+            text: watermarkText,
+            position: watermarkPosition,
+            fontSize: watermarkFontSize,
+            opacity: watermarkOpacity,
+            color: watermarkColor,
+            pages: watermarkPagesSpec.trim() || null,
+            out: watermarkOutPath,
+            force: true,
+          });
+          toastNotice = {
+            title: `Watermarked ${rep.pages_watermarked.length} ${rep.pages_watermarked.length === 1 ? 'page' : 'pages'}`,
+            subtitle: basename(rep.output),
+            targetPath: rep.output,
+          };
+        }
       } else if (activeTool === 'protect' && primaryFile) {
+        if (protectAction === 'protect') {
+          if (!protectPassword) {
+            errorBanner = {
+              code: 'invalid_selection',
+              message: 'Bitte ein Passwort eingeben.',
+              hint: null,
+            };
+            return;
+          }
+          if (protectPassword !== protectPasswordConfirm) {
+            errorBanner = {
+              code: 'password_mismatch',
+              message: 'Passwörter stimmen nicht überein.',
+              hint: 'Bitte überprüfen Sie die Wiederholung des Passworts.',
+            };
+            return;
+          }
+        } else if (protectAction === 'unlock') {
+          if (!protectPassword && sessionPassword) {
+            protectPassword = sessionPassword;
+          }
+          if (!protectPassword) {
+            errorBanner = {
+              code: 'invalid_selection',
+              message: 'Bitte das Passwort zum Entsperren eingeben.',
+              hint: null,
+            };
+            return;
+          }
+        }
         const rep = await runProtectCommand({
           action: protectAction,
           input: primaryFile.path,
@@ -489,14 +711,15 @@
               : null,
           allowPrint: protectAllowPrint,
           allowCopy: protectAllowCopy,
+          allowModify: protectAllowModify,
           out: protectOutPath,
           force: true,
         });
         toastNotice = {
           title:
             rep.action === 'protect'
-              ? `Encrypted PDF (${rep.pages} pages)`
-              : `Unlocked PDF (${rep.pages} pages)`,
+              ? `PDF geschützt (${rep.pages} Seiten)`
+              : `PDF entsperrt (${rep.pages} Seiten)`,
           subtitle: basename(rep.output),
           targetPath: rep.output,
         };
@@ -510,6 +733,19 @@
   }
 
   function handleGlobalKeydown(event: KeyboardEvent) {
+    if (passwordDialogOpen) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handlePasswordCancel();
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void handlePasswordSubmit();
+        return;
+      }
+    }
+
     const isCmd = event.metaKey || event.ctrlKey;
     const targetTag = (event.target as HTMLElement | null)?.tagName;
     const isInputFocused =
@@ -624,6 +860,30 @@
           <span class="app-name">Sheaf</span>
           <span class="title-sep" aria-hidden="true">·</span>
           <span class="tool-title">{currentToolMeta.label}</span>
+          {#if primaryFile}
+            <span class="title-sep" aria-hidden="true">·</span>
+            {#if !primaryFile.encrypted}
+              <span class="lock-status-badge unencrypted" title="Datei ist unverschlüsselt">
+                <LockOpen size={12} strokeWidth={2} />
+                <span>Unverschlüsselt</span>
+              </span>
+            {:else if isReadOnly}
+              <span class="lock-status-badge readonly" title="Datei ist schreibgeschützt / eingeschränkte Rechte">
+                <Lock size={12} strokeWidth={2} />
+                <span>Schreibgeschützt</span>
+              </span>
+            {:else if sessionPassword}
+              <span class="lock-status-badge unlocked" title="Datei ist entschlüsselt mit Rechten">
+                <Lock size={12} strokeWidth={2} />
+                <span>Entschlüsselt</span>
+              </span>
+            {:else}
+              <span class="lock-status-badge locked" title="Datei ist geschützt">
+                <Lock size={12} strokeWidth={2} />
+                <span>Geschützt</span>
+              </span>
+            {/if}
+          {/if}
         </div>
 
         <div class="titlebar-actions">
@@ -1297,115 +1557,292 @@
                 {/if}
               {:else if activeTool === 'watermark' && primaryFile}
                 <div class="option-group">
-                  <label class="field-label" for="watermark-text-input">
-                    Watermark Text
-                  </label>
-                  <input
-                    id="watermark-text-input"
-                    type="text"
-                    class="text-input"
-                    value={watermarkText}
-                    oninput={(e) => {
-                      watermarkText = e.currentTarget.value;
-                    }}
-                    placeholder="CONFIDENTIAL"
-                  />
-                </div>
-
-                <div class="option-group">
-                  <label class="field-label" for="watermark-pos-select">
-                    Placement
-                  </label>
-                  <select
-                    id="watermark-pos-select"
-                    class="text-input"
-                    value={watermarkPosition}
-                    onchange={(e) => {
-                      watermarkPosition = e.currentTarget.value as WatermarkPositionUi;
-                    }}
-                  >
-                    <option value="diagonal">Diagonal (45°)</option>
-                    <option value="center">Center (Horizontal)</option>
-                    <option value="top-left">Top Left</option>
-                    <option value="top-right">Top Right</option>
-                    <option value="bottom-left">Bottom Left</option>
-                    <option value="bottom-right">Bottom Right</option>
-                  </select>
-                </div>
-
-                <div class="option-group">
-                  <label class="field-label" for="watermark-size-range">
-                    Font Size ({watermarkFontSize} pt)
-                  </label>
-                  <input
-                    id="watermark-size-range"
-                    type="range"
-                    min="14"
-                    max="120"
-                    step="2"
-                    value={watermarkFontSize}
-                    oninput={(e) => {
-                      watermarkFontSize = Number(e.currentTarget.value) || 48;
-                    }}
-                  />
-                </div>
-
-                <div class="option-group">
-                  <label class="field-label" for="watermark-opacity-range">
-                    Opacity ({Math.round(watermarkOpacity * 100)}%)
-                  </label>
-                  <input
-                    id="watermark-opacity-range"
-                    type="range"
-                    min="0.05"
-                    max="0.9"
-                    step="0.05"
-                    value={watermarkOpacity}
-                    oninput={(e) => {
-                      watermarkOpacity = Number(e.currentTarget.value) || 0.25;
-                    }}
-                  />
-                </div>
-
-                <div class="option-group">
-                  <span class="field-label">Color</span>
-                  <div class="segmented-control">
-                    {#each [
-                      { label: 'Gray', hex: '#6B7280' },
-                      { label: 'Red', hex: '#DC2626' },
-                      { label: 'Blue', hex: '#2563EB' },
-                    ] as c (c.hex)}
-                      <button
-                        type="button"
-                        class="seg-btn"
-                        class:active={watermarkColor === c.hex}
-                        onclick={() => {
-                          watermarkColor = c.hex;
-                        }}
-                      >
-                        {c.label}
-                      </button>
-                    {/each}
+                  <span class="field-label">Overlay Type</span>
+                  <div class="segmented-control" role="radiogroup" aria-label="Overlay Type">
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={overlayMode === 'watermark'}
+                      onclick={() => {
+                        overlayMode = 'watermark';
+                      }}
+                    >
+                      Watermark
+                    </button>
+                    <button
+                      type="button"
+                      class="seg-btn"
+                      class:active={overlayMode === 'number'}
+                      onclick={() => {
+                        overlayMode = 'number';
+                      }}
+                    >
+                      Page Numbers
+                    </button>
                   </div>
                 </div>
 
-                <div class="option-group">
-                  <label class="field-label" for="watermark-pages-input">
-                    Target Pages (empty = all pages)
-                  </label>
-                  <input
-                    id="watermark-pages-input"
-                    type="text"
-                    class="text-input"
-                    value={watermarkPagesSpec}
-                    oninput={(e) =>
-                      handleRangesInputEdit(e.currentTarget.value, 'watermark')}
-                    placeholder="All pages"
-                  />
+                {#if overlayMode === 'watermark'}
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-text-input">
+                      Watermark Text
+                    </label>
+                    <input
+                      id="watermark-text-input"
+                      type="text"
+                      class="text-input"
+                      value={watermarkText}
+                      oninput={(e) => {
+                        watermarkText = e.currentTarget.value;
+                      }}
+                      placeholder="CONFIDENTIAL"
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-pos-select">
+                      Placement
+                    </label>
+                    <select
+                      id="watermark-pos-select"
+                      class="text-input"
+                      value={watermarkPosition}
+                      onchange={(e) => {
+                        watermarkPosition = e.currentTarget.value as WatermarkPositionUi;
+                      }}
+                    >
+                      <option value="diagonal">Diagonal (45°)</option>
+                      <option value="center">Center (Horizontal)</option>
+                      <option value="top-left">Top Left</option>
+                      <option value="top-right">Top Right</option>
+                      <option value="bottom-left">Bottom Left</option>
+                      <option value="bottom-right">Bottom Right</option>
+                    </select>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-size-range">
+                      Font Size ({watermarkFontSize} pt)
+                    </label>
+                    <input
+                      id="watermark-size-range"
+                      type="range"
+                      min="14"
+                      max="120"
+                      step="2"
+                      value={watermarkFontSize}
+                      oninput={(e) => {
+                        watermarkFontSize = Number(e.currentTarget.value) || 48;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-opacity-range">
+                      Opacity ({Math.round(watermarkOpacity * 100)}%)
+                    </label>
+                    <input
+                      id="watermark-opacity-range"
+                      type="range"
+                      min="0.05"
+                      max="0.9"
+                      step="0.05"
+                      value={watermarkOpacity}
+                      oninput={(e) => {
+                        watermarkOpacity = Number(e.currentTarget.value) || 0.25;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Color</span>
+                    <div class="segmented-control">
+                      {#each [
+                        { label: 'Gray', hex: '#6B7280' },
+                        { label: 'Red', hex: '#DC2626' },
+                        { label: 'Blue', hex: '#2563EB' },
+                      ] as c (c.hex)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={watermarkColor === c.hex}
+                          onclick={() => {
+                            watermarkColor = c.hex;
+                          }}
+                        >
+                          {c.label}
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="watermark-pages-input">
+                      Target Pages (empty = all pages)
+                    </label>
+                    <input
+                      id="watermark-pages-input"
+                      type="text"
+                      class="text-input"
+                      value={watermarkPagesSpec}
+                      oninput={(e) =>
+                        handleRangesInputEdit(e.currentTarget.value, 'watermark')}
+                      placeholder="All pages"
+                    />
+                  </div>
+                {:else}
+                  <div class="option-group">
+                    <label class="field-label" for="number-format-input">
+                      Format ({'{n}'}, {'{total}'}, {'{page}'}, {'{pages}'})
+                    </label>
+                    <input
+                      id="number-format-input"
+                      type="text"
+                      class="text-input"
+                      value={numberFormat}
+                      oninput={(e) => {
+                        numberFormat = e.currentTarget.value;
+                      }}
+                      placeholder={"Page {n} of {total}"}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-pos-select">
+                      Placement
+                    </label>
+                    <select
+                      id="number-pos-select"
+                      class="text-input"
+                      value={numberPosition}
+                      onchange={(e) => {
+                        numberPosition = e.currentTarget.value as NumberPositionUi;
+                      }}
+                    >
+                      <option value="bottom-center">Bottom Center</option>
+                      <option value="bottom-right">Bottom Right</option>
+                      <option value="bottom-left">Bottom Left</option>
+                      <option value="top-center">Top Center</option>
+                      <option value="top-right">Top Right</option>
+                      <option value="top-left">Top Left</option>
+                    </select>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-start-input">
+                      Start Number ({'{n}'})
+                    </label>
+                    <input
+                      id="number-start-input"
+                      type="number"
+                      min="1"
+                      class="text-input"
+                      value={numberStart}
+                      oninput={(e) => {
+                        numberStart = Math.max(1, Number(e.currentTarget.value) || 1);
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-size-range">
+                      Font Size ({numberFontSize} pt)
+                    </label>
+                    <input
+                      id="number-size-range"
+                      type="range"
+                      min="8"
+                      max="36"
+                      step="1"
+                      value={numberFontSize}
+                      oninput={(e) => {
+                        numberFontSize = Number(e.currentTarget.value) || 11;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-opacity-range">
+                      Opacity ({Math.round(numberOpacity * 100)}%)
+                    </label>
+                    <input
+                      id="number-opacity-range"
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={numberOpacity}
+                      oninput={(e) => {
+                        numberOpacity = Number(e.currentTarget.value) || 1.0;
+                      }}
+                    />
+                  </div>
+
+                  <div class="option-group">
+                    <span class="field-label">Color</span>
+                    <div class="segmented-control">
+                      {#each [
+                        { label: 'Black', hex: '#111827' },
+                        { label: 'Gray', hex: '#6B7280' },
+                        { label: 'Blue', hex: '#2563EB' },
+                      ] as c (c.hex)}
+                        <button
+                          type="button"
+                          class="seg-btn"
+                          class:active={numberColor === c.hex}
+                          onclick={() => {
+                            numberColor = c.hex;
+                          }}
+                        >
+                          {c.label}
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+
+                  <div class="option-group">
+                    <label class="field-label" for="number-pages-input">
+                      Target Pages (e.g. 2- to skip cover)
+                    </label>
+                    <input
+                      id="number-pages-input"
+                      type="text"
+                      class="text-input"
+                      value={numberPagesSpec}
+                      oninput={(e) =>
+                        handleRangesInputEdit(e.currentTarget.value, 'number')}
+                      placeholder="All pages"
+                    />
+                  </div>
+                {/if}
+
+                <div class="option-group overlay-preview-group">
+                  <div class="label-row">
+                    <span class="field-label">Live Preview</span>
+                    <span class="preview-badge">
+                      Page {selectedPages.size > 0 ? Math.min(...selectedPages) : 1}
+                    </span>
+                  </div>
+                  <div class="overlay-preview-box">
+                    {#if overlayPreviewItem}
+                      <img
+                        src={overlayPreviewItem.data_url}
+                        alt="Overlay Live Preview"
+                        class="overlay-preview-img"
+                        class:dimmed={overlayPreviewLoading}
+                      />
+                    {:else if overlayPreviewLoading}
+                      <div class="preview-status-text">Rendering preview…</div>
+                    {:else if overlayPreviewError}
+                      <div class="preview-error-text">{overlayPreviewError}</div>
+                    {:else}
+                      <div class="preview-status-text">Preview loading…</div>
+                    {/if}
+                  </div>
                 </div>
               {:else if activeTool === 'protect' && primaryFile}
                 <div class="option-group">
-                  <span class="field-label">Mode</span>
+                  <span class="field-label">Modus</span>
                   <div class="segmented-control">
                     <button
                       type="button"
@@ -1415,7 +1852,7 @@
                         protectAction = 'protect';
                       }}
                     >
-                      Encrypt
+                      Schützen
                     </button>
                     <button
                       type="button"
@@ -1423,69 +1860,132 @@
                       class:active={protectAction === 'unlock'}
                       onclick={() => {
                         protectAction = 'unlock';
+                        if (!protectPassword && sessionPassword) {
+                          protectPassword = sessionPassword;
+                        }
                       }}
                     >
-                      Unlock
+                      Entsperren
                     </button>
                   </div>
                 </div>
 
-                <div class="option-group">
-                  <label class="field-label" for="protect-pw-input">
-                    {protectAction === 'protect'
-                      ? 'Password to Open PDF'
-                      : 'Password to Unlock PDF'}
-                  </label>
-                  <input
-                    id="protect-pw-input"
-                    type="password"
-                    class="text-input"
-                    value={protectPassword}
-                    oninput={(e) => {
-                      protectPassword = e.currentTarget.value;
-                    }}
-                    placeholder="Enter password…"
-                  />
-                </div>
-
                 {#if protectAction === 'protect'}
+                  <label class="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={protectEnableProtection}
+                      onchange={(e) => {
+                        protectEnableProtection = e.currentTarget.checked;
+                      }}
+                    />
+                    <span>Passwortschutz aktivieren</span>
+                  </label>
+
+                  {#if protectEnableProtection}
+                    <div class="option-group">
+                      <label class="field-label" for="protect-pw-input">
+                        Passwort
+                      </label>
+                      <input
+                        id="protect-pw-input"
+                        type="password"
+                        class="text-input"
+                        value={protectPassword}
+                        oninput={(e) => {
+                          protectPassword = e.currentTarget.value;
+                        }}
+                        placeholder="Passwort zum Öffnen…"
+                      />
+                    </div>
+
+                    <div class="option-group">
+                      <label class="field-label" for="protect-pw-confirm-input">
+                        Passwort bestätigen
+                      </label>
+                      <input
+                        id="protect-pw-confirm-input"
+                        type="password"
+                        class="text-input"
+                        value={protectPasswordConfirm}
+                        oninput={(e) => {
+                          protectPasswordConfirm = e.currentTarget.value;
+                        }}
+                        placeholder="Passwort wiederholen…"
+                      />
+                      {#if protectPasswordConfirm && protectPassword !== protectPasswordConfirm}
+                        <span class="field-hint error">Passwörter stimmen nicht überein</span>
+                      {/if}
+                    </div>
+
+                    <div class="option-group">
+                      <label class="field-label" for="protect-owner-pw-input">
+                        Owner-Passwort (optional)
+                      </label>
+                      <input
+                        id="protect-owner-pw-input"
+                        type="password"
+                        class="text-input"
+                        value={protectOwnerPassword}
+                        oninput={(e) => {
+                          protectOwnerPassword = e.currentTarget.value;
+                        }}
+                        placeholder="Optionales Admin-Passwort…"
+                      />
+                    </div>
+
+                    <div class="option-group">
+                      <span class="field-label">Berechtigungen</span>
+                      <label class="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={protectAllowPrint}
+                          onchange={(e) => {
+                            protectAllowPrint = e.currentTarget.checked;
+                          }}
+                        />
+                        <span>Drucken erlauben</span>
+                      </label>
+
+                      <label class="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={protectAllowCopy}
+                          onchange={(e) => {
+                            protectAllowCopy = e.currentTarget.checked;
+                          }}
+                        />
+                        <span>Text kopieren erlauben</span>
+                      </label>
+
+                      <label class="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={protectAllowModify}
+                          onchange={(e) => {
+                            protectAllowModify = e.currentTarget.checked;
+                          }}
+                        />
+                        <span>Ändern erlauben</span>
+                      </label>
+                    </div>
+                  {/if}
+                {:else}
                   <div class="option-group">
-                    <label class="field-label" for="protect-owner-pw-input">
-                      Owner Password (optional)
+                    <label class="field-label" for="protect-unlock-pw-input">
+                      Passwort zum Entsperren
                     </label>
                     <input
-                      id="protect-owner-pw-input"
+                      id="protect-unlock-pw-input"
                       type="password"
                       class="text-input"
-                      value={protectOwnerPassword}
+                      value={protectPassword}
                       oninput={(e) => {
-                        protectOwnerPassword = e.currentTarget.value;
+                        protectPassword = e.currentTarget.value;
                       }}
-                      placeholder="Defaults to open password"
+                      placeholder="Passwort eingeben…"
                     />
                   </div>
-
-                  <label class="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={protectAllowPrint}
-                      onchange={(e) => {
-                        protectAllowPrint = e.currentTarget.checked;
-                      }}
-                    />
-                    <span>Allow printing</span>
-                  </label>
-
-                  <label class="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={protectAllowCopy}
-                      onchange={(e) => {
-                        protectAllowCopy = e.currentTarget.checked;
-                      }}
-                    />
-                    <span>Allow copying text & graphics</span>
-                  </label>
                 {/if}
               {:else if activeTool === 'info' && primaryFile}
                 <div class="info-list">
@@ -1562,6 +2062,8 @@
                           : 'Render PDF from Markdown'}
                   {:else if activeTool === 'protect'}
                     {protectAction === 'protect' ? 'Encrypt PDF' : 'Unlock PDF'}
+                  {:else if activeTool === 'watermark'}
+                    {overlayMode === 'watermark' ? 'Apply Watermark' : 'Apply Page Numbers'}
                   {:else}
                     {currentToolMeta.actionLabel}
                   {/if}
@@ -1612,6 +2114,81 @@
       theme = nextTheme;
     }}
   />
+
+  {#if passwordDialogOpen}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="pw-modal-backdrop" onclick={handlePasswordCancel}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="pw-modal-card" onclick={(e) => e.stopPropagation()}>
+        <div class="pw-modal-header">
+          <div class="pw-modal-title-row">
+            <Lock size={18} strokeWidth={2} class="pw-modal-icon" />
+            <h2 class="pw-modal-title">Geschützte Datei</h2>
+          </div>
+          <button
+            type="button"
+            class="pw-modal-close"
+            aria-label="Schließen"
+            onclick={handlePasswordCancel}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <p class="pw-modal-desc">
+          Diese Datei ist geschützt. Bitte Passwort eingeben.
+        </p>
+
+        <form onsubmit={(e) => { e.preventDefault(); void handlePasswordSubmit(); }}>
+          <div class="pw-modal-field">
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              type="password"
+              class="pw-modal-input"
+              placeholder="Passwort eingeben…"
+              value={passwordPromptInput}
+              oninput={(e) => {
+                passwordPromptInput = e.currentTarget.value;
+                passwordPromptError = null;
+              }}
+              autofocus
+            />
+          </div>
+
+          {#if passwordPromptError}
+            <div class="pw-modal-error">
+              {passwordPromptError}
+            </div>
+          {/if}
+
+          {#if passwordPromptAttempts >= 3}
+            <div class="pw-modal-hint">
+              Möglicherweise handelt es sich um ein Owner-Passwort mit abweichenden Rechten.
+            </div>
+          {/if}
+
+          <div class="pw-modal-actions">
+            <button
+              type="button"
+              class="ghost-btn"
+              onclick={handlePasswordCancel}
+            >
+              Abbrechen
+            </button>
+            <button
+              type="submit"
+              class="primary-action-btn modal-submit"
+              disabled={!passwordPromptInput.trim()}
+            >
+              Entsperren
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -2005,5 +2582,195 @@
     margin: 0;
     font-size: 12px;
     word-break: break-all;
+  }
+
+  .overlay-preview-group {
+    margin-top: var(--space-2);
+  }
+
+  .preview-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--accent);
+  }
+
+  .overlay-preview-box {
+    width: 100%;
+    min-height: 140px;
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2);
+    overflow: hidden;
+  }
+
+  .overlay-preview-img {
+    max-width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: opacity var(--transition-fast);
+  }
+
+  .overlay-preview-img.dimmed {
+    opacity: 0.5;
+  }
+
+  .preview-status-text {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .preview-error-text {
+    font-size: 11px;
+    color: var(--danger);
+    text-align: center;
+    padding: var(--space-2);
+  }
+
+  .lock-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 9999px;
+  }
+
+  .lock-status-badge.unencrypted {
+    color: var(--text-muted);
+    background-color: var(--border);
+  }
+
+  .lock-status-badge.unlocked {
+    color: #10b981;
+    background-color: rgba(16, 185, 129, 0.12);
+  }
+
+  .lock-status-badge.readonly,
+  .lock-status-badge.locked {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.12);
+  }
+
+  .field-hint.error {
+    color: #ef4444;
+    font-size: 11px;
+    margin-top: 4px;
+    display: block;
+  }
+
+  .pw-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .pw-modal-card {
+    width: 400px;
+    max-width: 90vw;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    padding: var(--space-4);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  }
+
+  .pw-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+  }
+
+  .pw-modal-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .pw-modal-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .pw-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+  }
+
+  .pw-modal-close:hover {
+    color: var(--text);
+    background-color: var(--border);
+  }
+
+  .pw-modal-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .pw-modal-field {
+    margin-bottom: var(--space-3);
+  }
+
+  .pw-modal-input {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .pw-modal-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .pw-modal-error {
+    color: #ef4444;
+    font-size: 12px;
+    margin-bottom: var(--space-2);
+  }
+
+  .pw-modal-hint {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-bottom: var(--space-3);
+    line-height: 1.4;
+  }
+
+  .pw-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .modal-submit {
+    padding: var(--space-2) var(--space-4);
   }
 </style>

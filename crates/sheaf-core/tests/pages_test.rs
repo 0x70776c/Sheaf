@@ -3,8 +3,8 @@ use std::process::Command;
 
 use lopdf::Document;
 use sheaf_core::{
-    NoProgress, PageOpOptions, PageSelection, SheafError, delete_pages, extract_pages,
-    get_effective_page_rotation, normalize_rotation_degrees, reorder_pages, rotate_pages,
+    LoadOptions, NoProgress, PageOpOptions, PageSelection, SheafError, delete_pages, extract_pages,
+    get_effective_page_rotation, load_pdf, normalize_rotation_degrees, reorder_pages, rotate_pages,
 };
 
 fn fixtures_dir() -> PathBuf {
@@ -18,7 +18,9 @@ fn fixtures_dir() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]
@@ -75,6 +77,7 @@ fn rotate_pages_is_additive_and_validates_bounds() {
     let out1 = temp.path().join("rot1.pdf");
     let sel1 = PageSelection::parse("1,3", 3).expect("parse");
     let opts1 = PageOpOptions {
+        load: LoadOptions::none(),
         out: Some(out1.clone()),
         force: false,
         dry_run: false,
@@ -95,6 +98,7 @@ fn rotate_pages_is_additive_and_validates_bounds() {
     // Step 2: Rotate all pages of rot1.pdf by 180 degrees -> page 1 = 270, page 2 = 180, page 3 = 270
     let out2 = temp.path().join("rot2.pdf");
     let opts2 = PageOpOptions {
+        load: LoadOptions::none(),
         out: Some(out2.clone()),
         force: false,
         dry_run: false,
@@ -110,6 +114,7 @@ fn rotate_pages_is_additive_and_validates_bounds() {
     let out3 = temp.path().join("rot3.pdf");
     let sel3 = PageSelection::parse("1", 3).expect("parse");
     let opts3 = PageOpOptions {
+        load: LoadOptions::none(),
         out: Some(out3.clone()),
         force: false,
         dry_run: false,
@@ -138,6 +143,7 @@ fn delete_pages_removes_selected_and_rejects_deleting_all() {
 
     let sel = PageSelection::parse("2, 5-8, 12", 12).expect("parse");
     let opts = PageOpOptions {
+        load: LoadOptions::none(),
         out: Some(out.clone()),
         force: false,
         dry_run: false,
@@ -156,6 +162,7 @@ fn delete_pages_removes_selected_and_rejects_deleting_all() {
         &src,
         &all_sel,
         &PageOpOptions {
+            load: LoadOptions::none(),
             out: Some(temp.path().join("empty.pdf")),
             force: false,
             dry_run: false,
@@ -174,6 +181,7 @@ fn reorder_pages_updates_page_sequence() {
 
     let order = PageSelection::parse("3, 1, 2", 3).expect("parse");
     let opts = PageOpOptions {
+        load: LoadOptions::none(),
         out: Some(out.clone()),
         force: false,
         dry_run: false,
@@ -203,6 +211,7 @@ fn extract_pages_creates_valid_subset_pdf() {
 
     let sel = PageSelection::parse("4, 9-11", 12).expect("parse");
     let opts = PageOpOptions {
+        load: LoadOptions::none(),
         out: Some(out.clone()),
         force: false,
         dry_run: false,

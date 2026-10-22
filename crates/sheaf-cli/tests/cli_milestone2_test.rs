@@ -384,6 +384,14 @@ fn cli_info_on_encrypted_pdf_succeeds_with_exit_0() {
     assert_eq!(json["ok"], true);
     assert_eq!(json["data"]["files"][0]["encrypted"], true);
     assert!(json["data"]["files"][0]["pages"].is_null());
+    let enc = &json["data"]["files"][0]["encryption"];
+    assert!(enc.is_object());
+    assert_eq!(enc["algorithm"], "rc4");
+    assert_eq!(enc["key_bits"], 128);
+    assert_eq!(enc["revision"], 3);
+    assert_eq!(enc["permissions"]["print"], true);
+    assert_eq!(enc["permissions"]["copy"], false);
+    assert_eq!(enc["permissions"]["modify"], false);
 }
 
 #[test]

@@ -77,6 +77,8 @@ npm run build
 
 ## CLI Reference
 
+> For complete generated command-line reference documentation, see [docs/CLI.md](docs/CLI.md).
+
 ### Global Flags
 
 Available on every subcommand:
@@ -212,7 +214,20 @@ sheaf watermark draft.pdf --text "DRAFT" --position bottom-right --color red --o
 
 ---
 
-### 8. `sheaf protect` & `sheaf unlock`
+### 8. `sheaf number`
+Stamp vector page numbers onto PDF pages with format placeholders (`{n}`, `{total}`, `{page}`, `{pages}`), placement presets, start number, and page selection:
+
+```bash
+# Bottom-center page numbering across all pages
+sheaf number report.pdf -o report_numbered.pdf
+
+# Bottom-right numbering starting at page 2, skipping cover page
+sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right --start 1 --pages "2-" -o thesis_numbered.pdf --json
+```
+
+---
+
+### 9. `sheaf protect` & `sheaf unlock`
 Encrypt (`protect`) a PDF with user/owner passwords and print/copy permissions, or decrypt (`unlock`) an encrypted PDF (returns exit code `4` with `"code": "wrong_password"` if the password is incorrect).
 
 ```bash
@@ -225,7 +240,7 @@ sheaf unlock locked.pdf --password "open-secret" -o unlocked.pdf --json
 
 ---
 
-### 9. `sheaf info`
+### 10. `sheaf info`
 Inspect structural properties and metadata (`size_bytes`, `pdf_version`, `pages`, `encrypted`, `metadata`, `has_outlines`, `outline_count`, `first_page_size_pt`). Encrypted PDFs return exit code `0` with `"encrypted": true` and `"pages": null`.
 
 ```bash
@@ -235,7 +250,7 @@ sheaf info a.pdf b.pdf --json
 
 ---
 
-### 10. `sheaf verify`
+### 11. `sheaf verify`
 Verify PDF files for structural integrity (loads cleanly, valid catalog & page tree, resolvable page content streams and resources). With `--deep`, also runs `qpdf --check` when available.
 
 ```bash
@@ -245,7 +260,7 @@ sheaf verify out/*.pdf --deep --json
 
 ---
 
-### 11. `sheaf capabilities`
+### 12. `sheaf capabilities`
 Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`).
 
 ```bash

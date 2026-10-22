@@ -43,7 +43,12 @@ impl Command for RenderArgs {
             None => default_output_dir(&self.input),
         };
 
+        let mut resolver = crate::password::PasswordResolver::new();
+        let pw = resolver.resolve_open_password(&self.password_opts)?;
+        let load_opts = sheaf_core::LoadOptions { password: pw };
+
         let opts = RenderOptions {
+            load: load_opts,
             pages: pages_spec,
             scale,
             out,
@@ -57,7 +62,7 @@ impl Command for RenderArgs {
 
         Ok(Outcome {
             report,
-            warnings: Vec::new(),
+            warnings: resolver.warnings,
             dry_run: ctx.global.dry_run,
             failure: None,
         })

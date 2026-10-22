@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf_from_bytes};
 use crate::ops::split::sanitize_stem;
 use crate::{Progress, SheafError};
 
@@ -93,6 +94,8 @@ impl CompressPreset {
 /// Options for [`compress_with_options`].
 #[derive(Debug, Clone, Default)]
 pub struct CompressOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// Selected compression preset.
     pub preset: CompressPreset,
     /// Convert embedded images to grayscale (`DeviceGray`) during resampling.
@@ -132,6 +135,9 @@ pub struct CompressReport {
     pub already_optimal: bool,
     /// Indicates whether `--dry-run` was active.
     pub dry_run: bool,
+    /// Whether the input PDF was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Compresses a PDF file (`src`) using `preset` and writes the result to `out`.
@@ -160,6 +166,7 @@ pub fn compress(
     p: &dyn Progress,
 ) -> Result<CompressReport, SheafError> {
     let opts = CompressOptions {
+        load: LoadOptions::default(),
         preset,
         grayscale: false,
         out: Some(out.to_path_buf()),
@@ -192,6 +199,7 @@ pub fn compress(
 ///     out: Some(PathBuf::from("out.pdf")),
 ///     force: true,
 ///     dry_run: false,
+///     ..CompressOptions::default()
 /// };
 /// let report = compress_with_options(Path::new("input.pdf"), &opts, &NoProgress).unwrap();
 /// assert!(report.size_after_bytes <= report.size_before_bytes);
@@ -214,11 +222,9 @@ pub fn compress_with_options(
 
     p.report(0, 4);
 
-    let mut doc = Document::load_mem(&original_bytes)
-        .map_err(|e| SheafError::from_lopdf_with_path(e, src))?;
-    if doc.is_encrypted() {
-        return Err(SheafError::Encrypted);
-    }
+    let loaded = load_pdf_from_bytes(&original_bytes, src, &opts.load)?;
+    let was_encrypted = loaded.was_encrypted;
+    let mut doc = loaded.doc;
 
     if doc.get_pages().is_empty() {
         return Err(SheafError::InvalidPdf(format!(
@@ -296,6 +302,7 @@ pub fn compress_with_options(
         objects_deduped,
         already_optimal,
         dry_run: opts.dry_run,
+        was_encrypted,
     })
 }
 

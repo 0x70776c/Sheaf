@@ -104,6 +104,8 @@ fn cli_merge_creates_valid_combined_pdf() {
     assert!(status.success(), "sheaf merge CLI command failed");
     assert!(out.exists(), "output PDF was not created");
 
-    let merged = Document::load(&out).expect("load merged PDF");
+    let merged = sheaf_core::load_pdf(&out, &sheaf_core::LoadOptions::none())
+        .expect("load merged PDF")
+        .doc;
     assert_eq!(merged.get_pages().len(), 6);
 }

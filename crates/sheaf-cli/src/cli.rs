@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
+use crate::password::{NewPasswordArgs, OpenPasswordArgs};
+
 /// Progress reporting mode on `stderr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ProgressMode {
@@ -104,15 +106,21 @@ pub enum Commands {
     )]
     Watermark(WatermarkArgs),
 
+    /// Stamp customizable page numbers onto PDF pages
+    #[command(
+        after_help = "Examples:\n  sheaf number report.pdf -o numbered.pdf\n  sheaf number thesis.pdf --format \"Page {n} of {total}\" --position bottom-right --start 1 --pages \"2-\" -o thesis_numbered.pdf --json"
+    )]
+    Number(NumberArgs),
+
     /// Password-protect (encrypt) a PDF file
     #[command(
-        after_help = "Examples:\n  sheaf protect report.pdf --password \"secret123\" -o protected.pdf\n  sheaf protect contract.pdf --password \"open-pw\" --owner-password \"owner-pw\" --no-copy -o locked.pdf --json"
+        after_help = "Examples:\n  sheaf protect report.pdf --new-password-env PDF_PASS -o protected.pdf\n  sheaf protect contract.pdf --new-password-file /path/to/pw --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf --json"
     )]
     Protect(ProtectArgs),
 
     /// Remove password protection (decrypt) from an encrypted PDF file
     #[command(
-        after_help = "Examples:\n  sheaf unlock protected.pdf --password \"secret123\" -o unlocked.pdf\n  sheaf unlock encrypted.pdf --password \"user-secret\" -o plain.pdf --json"
+        after_help = "Examples:\n  sheaf unlock protected.pdf --password-env PDF_PASS -o unlocked.pdf\n  sheaf unlock encrypted.pdf --password-file /path/to/pw -o plain.pdf --json"
     )]
     Unlock(UnlockArgs),
 
@@ -129,6 +137,10 @@ pub enum Commands {
     /// Describe supported commands, flags, exit codes, and external tools
     #[command(after_help = "Examples:\n  sheaf capabilities --json\n  sheaf capabilities")]
     Capabilities(CapabilitiesArgs),
+
+    /// Generate Markdown documentation for all commands (internal)
+    #[command(hide = true)]
+    Docs(DocsArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -136,6 +148,9 @@ pub struct MergeArgs {
     /// Input PDF files in the desired merge order
     #[arg(required = true)]
     pub inputs: Vec<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Target output PDF file
     #[arg(short, long)]
@@ -151,6 +166,9 @@ pub struct MergeArgs {
 pub struct SplitArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Page ranges to split (e.g. "1-3,5,8-")
     #[arg(long)]
@@ -211,6 +229,9 @@ pub struct PagesRotateArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Page ranges to rotate (e.g. "1-3,5"; omit to rotate all pages)
     #[arg(long)]
     pub pages: Option<String>,
@@ -229,6 +250,9 @@ pub struct PagesDeleteArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Page ranges to delete (e.g. "2,5-7")
     #[arg(long)]
     pub pages: String,
@@ -242,6 +266,9 @@ pub struct PagesDeleteArgs {
 pub struct PagesReorderArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// New page order specification (e.g. "3,1,2,4-")
     #[arg(long)]
@@ -257,6 +284,9 @@ pub struct PagesExtractArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Page ranges to extract into a new PDF (e.g. "1-3,5")
     #[arg(long)]
     pub pages: String,
@@ -270,6 +300,9 @@ pub struct PagesExtractArgs {
 pub struct RenderArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Single 1-based page number to render
     #[arg(long, conflicts_with = "pages")]
@@ -300,6 +333,9 @@ pub struct RenderArgs {
 pub struct CompressArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Compression preset: low (220 DPI, JPEG 85), medium (150 DPI, JPEG 70), or high (100 DPI, JPEG 55)
     #[arg(long, default_value = "medium")]
@@ -352,6 +388,9 @@ pub struct ConvertToImagesArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Output image format: png or jpg
     #[arg(long, default_value = "png")]
     pub format: String,
@@ -397,6 +436,9 @@ pub struct ConvertToMarkdownArgs {
     /// Input PDF file
     pub input: PathBuf,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Optional 1-based page ranges to extract (omit to extract all pages)
     #[arg(long)]
     pub pages: Option<String>,
@@ -428,6 +470,9 @@ pub struct ConvertFromMarkdownArgs {
 pub struct WatermarkArgs {
     /// Input PDF file
     pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Text to stamp as a watermark
     #[arg(long)]
@@ -463,17 +508,72 @@ pub struct WatermarkArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct NumberArgs {
+    /// Input PDF file
+    pub input: PathBuf,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
+    /// Page number format template supporting {n}, {total}, {page}, and {pages}
+    #[arg(long, default_value = "{n} / {total}")]
+    pub format: String,
+
+    /// Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left
+    #[arg(long, default_value = "bottom-center")]
+    pub position: String,
+
+    /// Starting sequence number for {n} on the first selected page
+    #[arg(long, default_value_t = 1)]
+    pub start: u32,
+
+    /// Font size in PDF points (6..=300)
+    #[arg(long, default_value_t = 11.0)]
+    pub font_size: f32,
+
+    /// Opacity between 0.05 and 1.0
+    #[arg(long, default_value_t = 1.0)]
+    pub opacity: f32,
+
+    /// Color as #RRGGBB hex or preset name (gray, red, blue, black, green)
+    #[arg(long, default_value = "#111827")]
+    pub color: String,
+
+    /// Margin inset from page edges in PDF points (0..=200)
+    #[arg(long, default_value_t = 28.0)]
+    pub margin: f32,
+
+    /// Optional 1-based page ranges to number (omit to number all pages)
+    #[arg(long)]
+    pub pages: Option<String>,
+
+    /// Target output PDF file (defaults to {stem}_numbered.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct ProtectArgs {
     /// Input PDF file
     pub input: PathBuf,
 
-    /// User password required to open the PDF
-    #[arg(long)]
-    pub password: String,
+    /// Legacy user password flag (removed for security)
+    #[arg(long, hide = true)]
+    pub password: Option<String>,
 
-    /// Optional owner password (defaults to --password)
-    #[arg(long)]
+    /// Legacy owner password flag (removed for security)
+    #[arg(long, hide = true)]
     pub owner_password: Option<String>,
+
+    /// Legacy user password alias (removed for security)
+    #[arg(long, hide = true)]
+    pub user_password: Option<String>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
+    #[command(flatten)]
+    pub new_password: NewPasswordArgs,
 
     /// Disallow printing the protected PDF
     #[arg(long)]
@@ -482,6 +582,10 @@ pub struct ProtectArgs {
     /// Disallow copying text and graphics from the protected PDF
     #[arg(long)]
     pub no_copy: bool,
+
+    /// Disallow modifying contents, annotations, and forms in the protected PDF
+    #[arg(long)]
+    pub no_modify: bool,
 
     /// Target output PDF file (defaults to {stem}_protected.pdf)
     #[arg(short, long)]
@@ -493,9 +597,16 @@ pub struct UnlockArgs {
     /// Encrypted input PDF file
     pub input: PathBuf,
 
-    /// Password to unlock the PDF
-    #[arg(long)]
-    pub password: String,
+    /// Legacy password flag (removed for security)
+    #[arg(long, hide = true)]
+    pub password: Option<String>,
+
+    /// Legacy user password alias (removed for security)
+    #[arg(long, hide = true)]
+    pub user_password: Option<String>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 
     /// Target output PDF file (defaults to {stem}_unlocked.pdf)
     #[arg(short, long)]
@@ -507,6 +618,9 @@ pub struct InfoArgs {
     /// PDF files to inspect
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -515,6 +629,9 @@ pub struct VerifyArgs {
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
 
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+
     /// Also run qpdf --check if installed
     #[arg(long)]
     pub deep: bool,
@@ -522,3 +639,6 @@ pub struct VerifyArgs {
 
 #[derive(Debug, Clone, Default, Args)]
 pub struct CapabilitiesArgs {}
+
+#[derive(Debug, Clone, Default, Args)]
+pub struct DocsArgs {}

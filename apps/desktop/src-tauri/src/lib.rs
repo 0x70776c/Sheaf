@@ -15,13 +15,14 @@ use serde::Serialize;
 use sheaf_core::{
     CapabilitiesReport, CompressOptions, CompressPreset, CompressReport, ConvertPageSize,
     ConvertReport, DEFAULT_THUMBNAIL_WIDTH_PX, ImageFormat, ImagesToPdfOptions, InfoReport,
-    MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, PageOpOptions, PageSelection,
-    PagesReport, PdfToImagesOptions, PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport,
-    SheafError, SplitMode, SplitOptions, SplitReport, UnlockOptions, WatermarkOptions,
-    WatermarkPosition, WatermarkReport, capabilities, compress_with_options, delete_pages,
-    extract_pages, images_to_pdf, info, markdown_to_pdf, merge_with_options, pdf_to_images,
-    pdf_to_markdown, protect, render_thumbnails, reorder_pages, rotate_pages, split, unlock,
-    watermark,
+    LoadOptions, MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, NumberOptions,
+    NumberPosition, NumberReport, OverlayPosition, PageOpOptions, PageSelection, PagesReport,
+    PdfToImagesOptions, PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport, SheafError,
+    SplitMode, SplitOptions, SplitReport, UnlockOptions, WatermarkOptions, WatermarkPosition,
+    WatermarkReport, capabilities, compress_with_options, delete_pages, extract_pages,
+    format_page_number, images_to_pdf, info, markdown_to_pdf, merge_with_options, number,
+    pdf_to_images, pdf_to_markdown, preview_overlay_page, protect, render_thumbnails_with_options,
+    reorder_pages, rotate_pages, split, unlock, watermark,
 };
 use tauri::{AppHandle, Emitter, State};
 
@@ -154,6 +155,7 @@ pub fn execute_merge_op(
         _ => default_merged_path(first),
     };
     let opts = MergeOptions {
+        load: LoadOptions::default(),
         force,
         dry_run: false,
     };
@@ -198,6 +200,7 @@ pub fn execute_split_op(
 
     let target_dir = out_dir.map(Path::to_path_buf).unwrap_or_default();
     let opts = SplitOptions {
+        load: LoadOptions::default(),
         mode: split_mode,
         out_dir: target_dir,
         force,
@@ -217,6 +220,7 @@ pub fn execute_pages_op(
     progress: &dyn Progress,
 ) -> Result<PagesReport, SheafError> {
     let opts = PageOpOptions {
+        load: LoadOptions::default(),
         out: out
             .filter(|p| !p.as_os_str().is_empty())
             .map(Path::to_path_buf),
@@ -274,6 +278,7 @@ pub fn execute_compress_op(
 ) -> Result<CompressReport, SheafError> {
     let parsed_preset = CompressPreset::parse(preset)?;
     let opts = CompressOptions {
+        load: LoadOptions::default(),
         preset: parsed_preset,
         grayscale,
         out: out
@@ -313,6 +318,7 @@ pub fn execute_convert_op(
             let src = inputs.first().ok_or(SheafError::EmptySelection)?;
             let fmt = ImageFormat::parse(format.unwrap_or("png"))?;
             let opts = PdfToImagesOptions {
+                load: LoadOptions::default(),
                 format: fmt,
                 dpi: dpi.unwrap_or(150),
                 quality: quality.unwrap_or(85),
@@ -352,6 +358,7 @@ pub fn execute_convert_op(
         "to-markdown" => {
             let src = inputs.first().ok_or(SheafError::EmptySelection)?;
             let opts = PdfToMarkdownOptions {
+                load: LoadOptions::default(),
                 pages: clean_pages,
                 out: clean_out,
                 force,
@@ -398,6 +405,7 @@ pub fn execute_watermark_op(
 ) -> Result<WatermarkReport, SheafError> {
     let pos = WatermarkPosition::parse(position)?;
     let opts = WatermarkOptions {
+        load: LoadOptions::default(),
         text: text.to_string(),
         position: pos,
         font_size,
@@ -417,6 +425,45 @@ pub fn execute_watermark_op(
     watermark(input, &opts, progress)
 }
 
+/// Core execution helper for `run_number` (testable without a Tauri `AppHandle`).
+#[allow(clippy::too_many_arguments)]
+pub fn execute_number_op(
+    input: &Path,
+    format: &str,
+    position: &str,
+    start: u32,
+    font_size: f32,
+    opacity: f32,
+    color: &str,
+    margin: f32,
+    pages: Option<&str>,
+    out: Option<&Path>,
+    force: bool,
+    progress: &dyn Progress,
+) -> Result<NumberReport, SheafError> {
+    let pos = NumberPosition::parse(position)?;
+    let opts = NumberOptions {
+        load: LoadOptions::default(),
+        format: format.to_string(),
+        position: pos,
+        start,
+        font_size,
+        opacity,
+        color: color.to_string(),
+        margin,
+        pages: pages
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
+        out: out
+            .filter(|p| !p.as_os_str().is_empty())
+            .map(Path::to_path_buf),
+        force,
+        dry_run: false,
+    };
+    number(input, &opts, progress)
+}
+
 /// Core execution helper for `run_protect` (testable without a Tauri `AppHandle`).
 #[allow(clippy::too_many_arguments)]
 pub fn execute_protect_op(
@@ -426,6 +473,7 @@ pub fn execute_protect_op(
     owner_password: Option<&str>,
     allow_print: bool,
     allow_copy: bool,
+    allow_modify: bool,
     out: Option<&Path>,
     force: bool,
     progress: &dyn Progress,
@@ -437,13 +485,15 @@ pub fn execute_protect_op(
     match action {
         "protect" => {
             let opts = ProtectOptions {
-                user_password: password.to_string(),
+                load: LoadOptions::default(),
+                user_password: secrecy::SecretString::from(password.to_string()),
                 owner_password: owner_password
                     .map(str::trim)
                     .filter(|s| !s.is_empty())
-                    .map(str::to_string),
+                    .map(|s| secrecy::SecretString::from(s.to_string())),
                 allow_print,
                 allow_copy,
+                allow_modify,
                 out: clean_out,
                 force,
                 dry_run: false,
@@ -452,7 +502,7 @@ pub fn execute_protect_op(
         }
         "unlock" => {
             let opts = UnlockOptions {
-                password: password.to_string(),
+                password: secrecy::SecretString::from(password.to_string()),
                 out: clean_out,
                 force,
                 dry_run: false,
@@ -467,19 +517,35 @@ pub fn execute_protect_op(
 
 /// Inspects one or more local PDF files and returns their [`InfoReport`].
 #[tauri::command]
-async fn open_pdf(paths: Vec<String>) -> Result<InfoReport, CommandError> {
+async fn open_pdf(
+    paths: Vec<String>,
+    password: Option<String>,
+) -> Result<InfoReport, CommandError> {
     let path_bufs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
-    let res = tauri::async_runtime::spawn_blocking(move || info(&path_bufs, &NoProgress))
-        .await
-        .map_err(|e| CommandError {
-            code: "internal",
-            message: format!("Worker thread failed: {e}"),
-            hint: None,
-        })?;
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        if let Some(ref pw) = password
+            && !pw.is_empty()
+        {
+            for path in &path_bufs {
+                let load_opts = LoadOptions {
+                    password: Some(secrecy::SecretString::from(pw.clone())),
+                };
+                sheaf_core::load_pdf(path, &load_opts)?;
+            }
+        }
+        info(&path_bufs, &NoProgress)
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
     res.map_err(CommandError::from)
 }
 
-/// Renders page thumbnails on a worker thread, utilizing the on-disk thumbnail cache.
+/// Renders page thumbnails on a worker thread, utilizing the on-disk thumbnail cache
+/// for unencrypted PDFs, and RAM-only in-memory rendering for encrypted PDFs.
 #[tauri::command]
 async fn thumbnails(
     app: AppHandle,
@@ -487,6 +553,7 @@ async fn thumbnails(
     path: String,
     pages: Vec<u32>,
     width_px: Option<u32>,
+    password: Option<String>,
 ) -> Result<Vec<ThumbnailItem>, CommandError> {
     state.cancelled.store(false, Ordering::SeqCst);
     let cancelled = Arc::clone(&state.cancelled);
@@ -500,7 +567,19 @@ async fn thumbnails(
                 op: "thumbnails",
                 cancelled,
             };
-            let pngs = render_thumbnails(&src_path, &pages, target_width, None, &progress)?;
+            let load_opts = LoadOptions {
+                password: password
+                    .filter(|p| !p.is_empty())
+                    .map(secrecy::SecretString::from),
+            };
+            let pngs = render_thumbnails_with_options(
+                &src_path,
+                &pages,
+                target_width,
+                None,
+                &load_opts,
+                &progress,
+            )?;
             let mut items = Vec::with_capacity(pngs.len());
             for (&page, bytes) in pages.iter().zip(pngs) {
                 let (w, h) = parse_png_dimensions(&bytes);
@@ -793,6 +872,121 @@ async fn run_watermark(
     res.map_err(CommandError::from)
 }
 
+/// Runs PDF page numbering on a worker thread with progress reporting and cancellation support.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn run_number(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: String,
+    format: String,
+    position: String,
+    start: u32,
+    font_size: f32,
+    opacity: f32,
+    color: String,
+    margin: f32,
+    pages: Option<String>,
+    out: Option<String>,
+    force: bool,
+) -> Result<NumberReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_path = PathBuf::from(input);
+    let out_path = out.map(PathBuf::from);
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "number",
+            cancelled,
+        };
+        execute_number_op(
+            &input_path,
+            &format,
+            &position,
+            start,
+            font_size,
+            opacity,
+            &color,
+            margin,
+            pages.as_deref(),
+            out_path.as_deref(),
+            force,
+            &progress,
+        )
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
+/// Renders an in-memory live preview of a single PDF page with either a watermark or page number overlay.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn preview_overlay(
+    input: String,
+    page: u32,
+    total_pages: u32,
+    mode: String,
+    text: String,
+    position: String,
+    start: u32,
+    font_size: f32,
+    opacity: f32,
+    color: String,
+    margin: f32,
+    width_px: Option<u32>,
+) -> Result<ThumbnailItem, CommandError> {
+    let input_path = PathBuf::from(input);
+    let target_width = width_px.unwrap_or(240);
+
+    let res = tauri::async_runtime::spawn_blocking(move || -> Result<ThumbnailItem, SheafError> {
+        let pos = OverlayPosition::parse(&position)?;
+        let (resolved_text, bold, rot) = if mode == "number" {
+            let expanded =
+                format_page_number(&text, start, total_pages.max(1), page, total_pages.max(1))?;
+            (expanded, false, 0.0)
+        } else {
+            (text, true, pos.default_rotation_deg())
+        };
+        let png_bytes = preview_overlay_page(
+            &input_path,
+            page,
+            &resolved_text,
+            pos,
+            font_size,
+            opacity,
+            rot,
+            &color,
+            margin,
+            bold,
+            target_width,
+        )?;
+        let (w, h) = parse_png_dimensions(&png_bytes);
+        let b64 = BASE64_STANDARD.encode(&png_bytes);
+        Ok(ThumbnailItem {
+            page,
+            width_px: w,
+            height_px: h,
+            data_url: format!("data:image/png;base64,{b64}"),
+        })
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
 /// Runs PDF password protection (`protect`) or decryption (`unlock`) on a worker thread.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
@@ -805,6 +999,7 @@ async fn run_protect(
     owner_password: Option<String>,
     allow_print: bool,
     allow_copy: bool,
+    allow_modify: bool,
     out: Option<String>,
     force: bool,
 ) -> Result<ProtectReport, CommandError> {
@@ -826,6 +1021,7 @@ async fn run_protect(
             owner_password.as_deref(),
             allow_print,
             allow_copy,
+            allow_modify,
             out_path.as_deref(),
             force,
             &progress,
@@ -918,6 +1114,8 @@ pub fn run() {
             run_compress,
             run_convert,
             run_watermark,
+            run_number,
+            preview_overlay,
             run_protect,
             reveal_in_finder,
             open_path,
@@ -1062,7 +1260,27 @@ mod tests {
         .unwrap_or_else(|_| std::process::abort());
         assert_eq!(ext_rep.output_pages, 2);
 
-        // 4. Cancellation works and returns SheafError::Cancelled
+        // 4. Number operation end-to-end
+        let num_out = temp.path().join("ui_numbered.pdf");
+        let num_rep = execute_number_op(
+            &f3,
+            "Page {n} of {total}",
+            "bottom-right",
+            1,
+            12.0,
+            1.0,
+            "#111827",
+            28.0,
+            Some("2-3"),
+            Some(&num_out),
+            true,
+            &NoProgress,
+        )
+        .unwrap_or_else(|_| std::process::abort());
+        assert_eq!(num_rep.pages_numbered, vec![2, 3]);
+        assert!(num_out.exists());
+
+        // 5. Cancellation works and returns SheafError::Cancelled
         let cancelled_flag = Arc::new(AtomicBool::new(true));
         let cancel_progress = CancelProgress {
             cancelled: cancelled_flag,
@@ -1079,5 +1297,42 @@ mod tests {
             &cancel_progress,
         );
         assert!(matches!(cancel_res, Err(SheafError::Cancelled)));
+
+        // 6. Protect and Unlock operation end-to-end
+        let prot_out = temp.path().join("ui_protected.pdf");
+        let prot_rep = execute_protect_op(
+            "protect",
+            &f3,
+            "secret123",
+            Some("owner456"),
+            true,
+            true,
+            true,
+            Some(&prot_out),
+            true,
+            &NoProgress,
+        )
+        .unwrap_or_else(|_| std::process::abort());
+        assert_eq!(prot_rep.action, "protect");
+        assert_eq!(prot_rep.pages, 3);
+        assert!(prot_out.exists());
+
+        let unlock_out = temp.path().join("ui_unlocked.pdf");
+        let unlock_rep = execute_protect_op(
+            "unlock",
+            &prot_out,
+            "secret123",
+            None,
+            true,
+            true,
+            true,
+            Some(&unlock_out),
+            true,
+            &NoProgress,
+        )
+        .unwrap_or_else(|_| std::process::abort());
+        assert_eq!(unlock_rep.action, "unlock");
+        assert_eq!(unlock_rep.pages, 3);
+        assert!(unlock_out.exists());
     }
 }

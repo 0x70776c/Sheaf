@@ -11,6 +11,9 @@ import type {
   ImageFormatUi,
   InfoReport,
   MergeReport,
+  NumberPositionUi,
+  NumberReport,
+  OverlayModeUi,
   PagesActionUi,
   PagesReport,
   ProgressEventPayload,
@@ -85,19 +88,21 @@ export async function pickSaveMarkdownPath(defaultName: string): Promise<string 
   });
 }
 
-export async function openPdf(paths: string[]): Promise<InfoReport> {
-  return await invoke<InfoReport>('open_pdf', { paths });
+export async function openPdf(paths: string[], password?: string | null): Promise<InfoReport> {
+  return await invoke<InfoReport>('open_pdf', { paths, password: password ?? null });
 }
 
 export async function fetchThumbnails(
   path: string,
   pages: number[],
   widthPx = 160,
+  password?: string | null,
 ): Promise<ThumbnailItem[]> {
   return await invoke<ThumbnailItem[]>('thumbnails', {
     path,
     pages,
     widthPx,
+    password: password ?? null,
   });
 }
 
@@ -233,6 +238,72 @@ export async function runWatermarkCommand(
   });
 }
 
+export interface RunNumberParams {
+  input: string;
+  format: string;
+  position: NumberPositionUi;
+  start: number;
+  fontSize: number;
+  opacity: number;
+  color: string;
+  margin: number;
+  pages?: string | null;
+  out?: string | null;
+  force?: boolean;
+}
+
+export async function runNumberCommand(
+  params: RunNumberParams,
+): Promise<NumberReport> {
+  return await invoke<NumberReport>('run_number', {
+    input: params.input,
+    format: params.format,
+    position: params.position,
+    start: params.start,
+    fontSize: params.fontSize,
+    opacity: params.opacity,
+    color: params.color,
+    margin: params.margin,
+    pages: params.pages ?? null,
+    out: params.out ?? null,
+    force: params.force ?? true,
+  });
+}
+
+export interface PreviewOverlayParams {
+  input: string;
+  page: number;
+  totalPages: number;
+  mode: OverlayModeUi;
+  text: string;
+  position: string;
+  start: number;
+  fontSize: number;
+  opacity: number;
+  color: string;
+  margin: number;
+  widthPx?: number;
+}
+
+export async function previewOverlayCommand(
+  params: PreviewOverlayParams,
+): Promise<ThumbnailItem> {
+  return await invoke<ThumbnailItem>('preview_overlay', {
+    input: params.input,
+    page: params.page,
+    totalPages: params.totalPages,
+    mode: params.mode,
+    text: params.text,
+    position: params.position,
+    start: params.start,
+    fontSize: params.fontSize,
+    opacity: params.opacity,
+    color: params.color,
+    margin: params.margin,
+    widthPx: params.widthPx ?? 240,
+  });
+}
+
 export interface RunProtectParams {
   action: ProtectActionUi;
   input: string;
@@ -240,6 +311,7 @@ export interface RunProtectParams {
   ownerPassword?: string | null;
   allowPrint?: boolean;
   allowCopy?: boolean;
+  allowModify?: boolean;
   out?: string | null;
   force?: boolean;
 }
@@ -252,6 +324,7 @@ export async function runProtectCommand(params: RunProtectParams): Promise<Prote
     ownerPassword: params.ownerPassword ?? null,
     allowPrint: params.allowPrint ?? true,
     allowCopy: params.allowCopy ?? true,
+    allowModify: params.allowModify ?? true,
     out: params.out ?? null,
     force: params.force ?? true,
   });

@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
-use lopdf::Document;
 use predicates::prelude::*;
 use serde_json::Value;
 use sheaf_core::get_effective_page_rotation;
@@ -62,7 +61,9 @@ fn cli_pages_subcommands_end_to_end() {
         .expect("rotate 2");
     assert_eq!(out_rot2.status.code(), Some(0));
 
-    let doc_rot = Document::load(&rot_2).expect("load rot2");
+    let doc_rot = sheaf_core::load_pdf(&rot_2, &sheaf_core::LoadOptions::none())
+        .expect("load rot2")
+        .doc;
     let pmap = doc_rot.get_pages();
     // page 1: 90 + 0 = 90
     // page 2: (90 + 270) % 360 = 0
@@ -86,7 +87,9 @@ fn cli_pages_subcommands_end_to_end() {
         ])
         .assert()
         .success();
-    let doc_del = Document::load(&del_out).expect("load deleted");
+    let doc_del = sheaf_core::load_pdf(&del_out, &sheaf_core::LoadOptions::none())
+        .expect("load deleted")
+        .doc;
     assert_eq!(doc_del.get_pages().len(), 5);
 
     // 3. pages reorder
@@ -104,7 +107,9 @@ fn cli_pages_subcommands_end_to_end() {
         ])
         .assert()
         .success();
-    let doc_reord = Document::load(&reord_out).expect("load reordered");
+    let doc_reord = sheaf_core::load_pdf(&reord_out, &sheaf_core::LoadOptions::none())
+        .expect("load reordered")
+        .doc;
     assert_eq!(doc_reord.get_pages().len(), 3);
 
     // 4. pages extract
@@ -122,7 +127,9 @@ fn cli_pages_subcommands_end_to_end() {
         ])
         .assert()
         .success();
-    let doc_ext = Document::load(&ext_out).expect("load extracted");
+    let doc_ext = sheaf_core::load_pdf(&ext_out, &sheaf_core::LoadOptions::none())
+        .expect("load extracted")
+        .doc;
     assert_eq!(doc_ext.get_pages().len(), 3);
 }
 

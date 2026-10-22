@@ -9,11 +9,13 @@ use std::time::UNIX_EPOCH;
 use image::ImageEncoder;
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use pdfium_render::prelude::*;
+use secrecy::ExposeSecret;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::LoadOptions;
 use crate::ops::split::PageSelection;
 use crate::{Progress, SheafError};
 
@@ -37,6 +39,8 @@ pub enum RenderScale {
 /// Options for [`render_with_options`].
 #[derive(Debug, Clone)]
 pub struct RenderOptions {
+    /// Loading and decryption options for input PDF.
+    pub load: LoadOptions,
     /// 1-based page selection (`None` renders all pages in the document).
     pub pages: Option<String>,
     /// Target scaling mode (pixel width or DPI).
@@ -172,6 +176,20 @@ fn map_pdfium_error(err: PdfiumError, path: &Path) -> SheafError {
         ),
         other => SheafError::InvalidPdf(format!("{}: {other}", path.display())),
     }
+}
+
+fn map_pdfium_load_error(err: PdfiumError, path: &Path, had_password: bool) -> SheafError {
+    if let PdfiumError::PdfiumLibraryInternalError(
+        PdfiumInternalError::PasswordError | PdfiumInternalError::SecurityError,
+    ) = &err
+    {
+        if had_password {
+            return SheafError::WrongPassword;
+        } else {
+            return SheafError::Encrypted;
+        }
+    }
+    map_pdfium_error(err, path)
 }
 
 fn validate_width_px(width_px: u32) -> Result<i32, SheafError> {
@@ -329,7 +347,7 @@ pub fn render_page(src: &Path, page: u32, width_px: u32) -> Result<Vec<u8>, Shea
     let pdfium = get_pdfium()?;
     let doc = pdfium
         .load_pdf_from_file(src, None)
-        .map_err(|e| map_pdfium_error(e, src))?;
+        .map_err(|e| map_pdfium_load_error(e, src, false))?;
 
     let total = u32::try_from(doc.pages().len()).unwrap_or(0);
     if page == 0 || page > total {
@@ -347,6 +365,50 @@ pub fn render_page(src: &Path, page: u32, width_px: u32) -> Result<Vec<u8>, Shea
     let bitmap = pdf_page
         .render_with_config(&config)
         .map_err(|e| map_pdfium_error(e, src))?;
+
+    let (png_bytes, _, _) = encode_bitmap_to_png(&bitmap)?;
+    Ok(png_bytes)
+}
+
+/// Renders a 1-based page from in-memory PDF bytes to PNG bytes at `width_px` target width.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sheaf_core::ops::render::render_pdf_bytes_page;
+///
+/// let bytes = std::fs::read("document.pdf").unwrap();
+/// let png = render_pdf_bytes_page(&bytes, 1, 200).unwrap();
+/// assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+/// ```
+pub fn render_pdf_bytes_page(
+    pdf_bytes: &[u8],
+    page: u32,
+    width_px: u32,
+) -> Result<Vec<u8>, SheafError> {
+    let target_width = validate_width_px(width_px)?;
+    let pdfium = get_pdfium()?;
+    let dummy_path = Path::new("<memory>");
+    let doc = pdfium
+        .load_pdf_from_byte_slice(pdf_bytes, None)
+        .map_err(|e| map_pdfium_error(e, dummy_path))?;
+
+    let total = u32::try_from(doc.pages().len()).unwrap_or(0);
+    if page == 0 || page > total {
+        return Err(SheafError::PageOutOfRange { page, total });
+    }
+
+    let page_index =
+        i32::try_from(page - 1).map_err(|_| SheafError::PageOutOfRange { page, total })?;
+    let pdf_page = doc
+        .pages()
+        .get(page_index)
+        .map_err(|e| map_pdfium_error(e, dummy_path))?;
+
+    let config = PdfRenderConfig::new().set_target_width(target_width);
+    let bitmap = pdf_page
+        .render_with_config(&config)
+        .map_err(|e| map_pdfium_error(e, dummy_path))?;
 
     let (png_bytes, _, _) = encode_bitmap_to_png(&bitmap)?;
     Ok(png_bytes)
@@ -374,11 +436,15 @@ pub fn render_page(src: &Path, page: u32, width_px: u32) -> Result<Vec<u8>, Shea
 /// ).unwrap();
 /// assert_eq!(pngs.len(), 20);
 /// ```
-pub fn render_thumbnails(
+/// Renders thumbnails for a set of pages in a document.
+///
+/// Bypasses disk cache and operates RAM-only if password is provided or document is encrypted.
+pub fn render_thumbnails_with_options(
     src: &Path,
     pages: &[u32],
     width_px: u32,
     cache_dir: Option<&Path>,
+    load: &LoadOptions,
     p: &dyn Progress,
 ) -> Result<Vec<Vec<u8>>, SheafError> {
     if pages.is_empty() {
@@ -387,14 +453,22 @@ pub fn render_thumbnails(
     let target_width = validate_width_px(width_px)?;
     let _meta = fs::metadata(src)?;
 
-    let resolved_cache_dir = cache_dir
-        .map(Path::to_path_buf)
-        .unwrap_or_else(default_thumbnail_cache_dir);
-    fs::create_dir_all(&resolved_cache_dir)?;
+    let pw_str = load.password.as_ref().map(|s| s.expose_secret());
+    let bypass_disk_cache = pw_str.is_some();
+
+    let resolved_cache_dir = if !bypass_disk_cache {
+        let dir = cache_dir
+            .map(Path::to_path_buf)
+            .unwrap_or_else(default_thumbnail_cache_dir);
+        let _ = fs::create_dir_all(&dir);
+        Some(dir)
+    } else {
+        None
+    };
 
     let total_requested = u64::try_from(pages.len()).unwrap_or(u64::MAX);
     let mut results: Vec<Option<Vec<u8>>> = vec![None; pages.len()];
-    let mut cache_paths: Vec<PathBuf> = Vec::with_capacity(pages.len());
+    let mut cache_paths: Vec<Option<PathBuf>> = Vec::with_capacity(pages.len());
     let mut missing_indices: Vec<usize> = Vec::new();
 
     for (idx, &page) in pages.iter().enumerate() {
@@ -402,29 +476,34 @@ pub fn render_thumbnails(
             // Need document page count for accurate PageOutOfRange error
             let pdfium = get_pdfium()?;
             let doc = pdfium
-                .load_pdf_from_file(src, None)
-                .map_err(|e| map_pdfium_error(e, src))?;
+                .load_pdf_from_file(src, pw_str)
+                .map_err(|e| map_pdfium_load_error(e, src, pw_str.is_some()))?;
             let total = u32::try_from(doc.pages().len()).unwrap_or(0);
             return Err(SheafError::PageOutOfRange { page: 0, total });
         }
 
-        let key = thumbnail_cache_key(src, page, width_px)?;
-        let cache_file = resolved_cache_dir.join(format!("{key}.png"));
-        if let Ok(bytes) = fs::read(&cache_file)
-            && read_png_dimensions(&bytes).is_some()
-        {
-            results[idx] = Some(bytes);
+        if let Some(ref dir) = resolved_cache_dir {
+            let key = thumbnail_cache_key(src, page, width_px)?;
+            let cache_file = dir.join(format!("{key}.png"));
+            if let Ok(bytes) = fs::read(&cache_file)
+                && read_png_dimensions(&bytes).is_some()
+            {
+                results[idx] = Some(bytes);
+            } else {
+                missing_indices.push(idx);
+            }
+            cache_paths.push(Some(cache_file));
         } else {
             missing_indices.push(idx);
+            cache_paths.push(None);
         }
-        cache_paths.push(cache_file);
     }
 
     if !missing_indices.is_empty() {
         let pdfium = get_pdfium()?;
         let doc = pdfium
-            .load_pdf_from_file(src, None)
-            .map_err(|e| map_pdfium_error(e, src))?;
+            .load_pdf_from_file(src, pw_str)
+            .map_err(|e| map_pdfium_load_error(e, src, pw_str.is_some()))?;
         let total_doc_pages = u32::try_from(doc.pages().len()).unwrap_or(0);
 
         for &page in pages {
@@ -458,13 +537,15 @@ pub fn render_thumbnails(
                 .map_err(|e| map_pdfium_error(e, src))?;
             let (png_bytes, _, _) = encode_bitmap_to_png(&bitmap)?;
 
-            // Write atomically to cache (best-effort)
-            let _ = write_atomic(&cache_paths[idx], true, |file| {
-                let mut writer = BufWriter::new(file);
-                writer.write_all(&png_bytes)?;
-                writer.flush()?;
-                Ok(())
-            });
+            // Write atomically to cache (best-effort, only if not bypassing cache)
+            if let Some(Some(cache_file)) = cache_paths.get(idx) {
+                let _ = write_atomic(cache_file, true, |file| {
+                    let mut writer = BufWriter::new(file);
+                    writer.write_all(&png_bytes)?;
+                    writer.flush()?;
+                    Ok(())
+                });
+            }
 
             results[idx] = Some(png_bytes);
         }
@@ -486,6 +567,36 @@ pub fn render_thumbnails(
     Ok(out)
 }
 
+/// Renders thumbnails for a set of pages in a document, writing rendered PNGs to an on-disk cache.
+///
+/// Subsequent calls with identical file content and parameters reuse the cached PNGs.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use sheaf_core::{DEFAULT_THUMBNAIL_WIDTH_PX, NoProgress, render_thumbnails};
+///
+/// let pages: Vec<u32> = (1..=20).collect();
+/// let pngs = render_thumbnails(
+///     Path::new("large.pdf"),
+///     &pages,
+///     DEFAULT_THUMBNAIL_WIDTH_PX,
+///     None,
+///     &NoProgress,
+/// ).unwrap();
+/// assert_eq!(pngs.len(), 20);
+/// ```
+pub fn render_thumbnails(
+    src: &Path,
+    pages: &[u32],
+    width_px: u32,
+    cache_dir: Option<&Path>,
+    p: &dyn Progress,
+) -> Result<Vec<Vec<u8>>, SheafError> {
+    render_thumbnails_with_options(src, pages, width_px, cache_dir, &LoadOptions::none(), p)
+}
+
 /// Renders one or more PDF pages to PNG files on disk according to [`RenderOptions`].
 ///
 /// Supports rendering by pixel width (`--width`) or resolution (`--dpi`), single-file or
@@ -495,9 +606,10 @@ pub fn render_thumbnails(
 ///
 /// ```no_run
 /// use std::path::{Path, PathBuf};
-/// use sheaf_core::{NoProgress, RenderOptions, RenderScale, render_with_options};
+/// use sheaf_core::{LoadOptions, NoProgress, RenderOptions, RenderScale, render_with_options};
 ///
 /// let opts = RenderOptions {
+///     load: LoadOptions::none(),
 ///     pages: Some("1-2".to_string()),
 ///     scale: RenderScale::WidthPx(160),
 ///     out: PathBuf::from("thumbs"),
@@ -530,10 +642,11 @@ pub fn render_with_options(
         }
     }
 
+    let pw_str = opts.load.password.as_ref().map(|s| s.expose_secret());
     let pdfium = get_pdfium()?;
     let doc = pdfium
-        .load_pdf_from_file(src, None)
-        .map_err(|e| map_pdfium_error(e, src))?;
+        .load_pdf_from_file(src, pw_str)
+        .map_err(|e| map_pdfium_load_error(e, src, pw_str.is_some()))?;
 
     let total_pages = u32::try_from(doc.pages().len()).unwrap_or(0);
     if total_pages == 0 {
@@ -591,7 +704,7 @@ pub fn render_with_options(
         }
     }
 
-    let resolved_cache_dir = if opts.use_cache {
+    let resolved_cache_dir = if opts.use_cache && pw_str.is_none() {
         let dir = opts
             .cache_dir
             .clone()

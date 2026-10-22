@@ -4,9 +4,9 @@ use std::process::Command;
 use image::ImageReader;
 use lopdf::Document;
 use sheaf_core::{
-    ConvertPageSize, ImageFormat, ImagesToPdfOptions, MarkdownToPdfOptions, NoProgress,
-    PdfToImagesOptions, PdfToMarkdownOptions, Progress, SheafError, images_to_pdf, markdown_to_pdf,
-    pdf_to_images, pdf_to_markdown,
+    ConvertPageSize, ImageFormat, ImagesToPdfOptions, LoadOptions, MarkdownToPdfOptions,
+    NoProgress, PdfToImagesOptions, PdfToMarkdownOptions, Progress, SheafError, images_to_pdf,
+    load_pdf, markdown_to_pdf, pdf_to_images, pdf_to_markdown,
 };
 
 struct CancelledProgress;
@@ -29,7 +29,9 @@ fn fixtures_dir() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]
@@ -70,6 +72,7 @@ fn roundtrip_pdf_to_images_and_images_to_pdf() {
     let png_rep = pdf_to_images(
         &src_pdf,
         &PdfToImagesOptions {
+            load: LoadOptions::none(),
             format: ImageFormat::Png,
             dpi: 150,
             quality: 85,
@@ -99,6 +102,7 @@ fn roundtrip_pdf_to_images_and_images_to_pdf() {
     let jpg_rep = pdf_to_images(
         &src_pdf,
         &PdfToImagesOptions {
+            load: LoadOptions::none(),
             format: ImageFormat::Jpg,
             dpi: 72,
             quality: 80,
@@ -206,6 +210,7 @@ sheaf convert from-markdown architecture.md -o architecture.pdf
     let pdf_to_md_rep = pdf_to_markdown(
         &pdf_out,
         &PdfToMarkdownOptions {
+            load: LoadOptions::none(),
             pages: None,
             out: Some(extracted_md_path.clone()),
             force: false,
@@ -266,6 +271,7 @@ fn convert_dry_run_and_error_cases() {
     let enc_err = pdf_to_markdown(
         &encrypted,
         &PdfToMarkdownOptions {
+            load: LoadOptions::none(),
             pages: None,
             out: Some(temp.path().join("enc.md")),
             force: false,
@@ -280,6 +286,7 @@ fn convert_dry_run_and_error_cases() {
     let cancel_err = pdf_to_markdown(
         &src_pdf,
         &PdfToMarkdownOptions {
+            load: LoadOptions::none(),
             pages: None,
             out: Some(temp.path().join("cancel.md")),
             force: false,

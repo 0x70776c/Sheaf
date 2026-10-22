@@ -7,6 +7,7 @@ expression: info_val
     "files": [
       {
         "encrypted": false,
+        "encryption": null,
         "first_page_size_pt": [
           595.0,
           842.0

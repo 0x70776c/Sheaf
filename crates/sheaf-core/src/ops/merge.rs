@@ -8,24 +8,18 @@ use serde::Serialize;
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
+use crate::load::{LoadOptions, load_pdf};
 use crate::{Progress, SheafError};
 
 /// Options for merging PDF files.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MergeOptions {
+    /// Loading and decryption options for input PDFs.
+    pub load: LoadOptions,
     /// Overwrite existing output file if `true`.
     pub force: bool,
     /// Validate inputs and compute report without writing the output file.
     pub dry_run: bool,
-}
-
-impl Default for MergeOptions {
-    fn default() -> Self {
-        Self {
-            force: true,
-            dry_run: false,
-        }
-    }
 }
 
 /// Report returned after merging PDF files.
@@ -37,6 +31,9 @@ pub struct MergeReport {
     pub output: PathBuf,
     /// Total number of pages in the merged PDF.
     pub pages_total: u32,
+    /// Whether any input file was originally encrypted.
+    #[serde(skip)]
+    pub was_encrypted: bool,
 }
 
 /// Merges multiple PDF files into a single output PDF file (overwriting `out` if it exists,
@@ -66,6 +63,7 @@ pub struct MergeReport {
 /// ```
 pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), SheafError> {
     let opts = MergeOptions {
+        load: LoadOptions::default(),
         force: true,
         dry_run: false,
     };
@@ -89,7 +87,7 @@ pub fn merge(inputs: &[PathBuf], out: &Path, p: &dyn Progress) -> Result<(), She
 /// use sheaf_core::NoProgress;
 ///
 /// let inputs = vec![PathBuf::from("a.pdf"), PathBuf::from("b.pdf")];
-/// let opts = MergeOptions { force: false, dry_run: true };
+/// let opts = MergeOptions { force: false, dry_run: true, ..MergeOptions::default() };
 /// let report = merge_with_options(&inputs, Path::new("out.pdf"), &opts, &NoProgress).unwrap();
 /// println!("Total pages: {}", report.pages_total);
 /// ```
@@ -113,25 +111,16 @@ pub fn merge_with_options(
     let mut documents_pages: Vec<(ObjectId, Object)> = Vec::new();
     let mut documents_objects: BTreeMap<ObjectId, Object> = BTreeMap::new();
     let mut merged_doc = Document::with_version("1.5");
+    let mut any_was_encrypted = false;
 
     for (idx, path) in inputs.iter().enumerate() {
         if p.is_cancelled() {
             return Err(SheafError::Cancelled);
         }
 
-        if !path.exists() {
-            return Err(SheafError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("File not found: {}", path.display()),
-            )));
-        }
-
-        let mut doc =
-            Document::load(path).map_err(|e| SheafError::from_lopdf_with_path(e, path))?;
-
-        if doc.is_encrypted() {
-            return Err(SheafError::Encrypted);
-        }
+        let loaded = load_pdf(path, &opts.load)?;
+        any_was_encrypted |= loaded.was_encrypted;
+        let mut doc = loaded.doc;
 
         doc.renumber_objects_with(max_id);
         max_id = doc.max_id.saturating_add(1);
@@ -170,6 +159,7 @@ pub fn merge_with_options(
             inputs: inputs.to_vec(),
             output: out.to_path_buf(),
             pages_total,
+            was_encrypted: any_was_encrypted,
         });
     }
 
@@ -274,6 +264,7 @@ pub fn merge_with_options(
         inputs: inputs.to_vec(),
         output: out.to_path_buf(),
         pages_total,
+        was_encrypted: any_was_encrypted,
     })
 }
 

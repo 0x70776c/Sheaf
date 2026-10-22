@@ -3,8 +3,8 @@ use std::process::Command;
 
 use lopdf::Document;
 use sheaf_core::{
-    NoProgress, Progress, ProtectOptions, SheafError, UnlockOptions, WatermarkOptions,
-    WatermarkPosition, info, protect, unlock, watermark,
+    LoadOptions, NoProgress, Progress, ProtectOptions, SheafError, UnlockOptions, WatermarkOptions,
+    WatermarkPosition, info, load_pdf, protect, unlock, watermark,
 };
 
 struct CancelledProgress;
@@ -27,7 +27,9 @@ fn fixtures_dir() -> PathBuf {
 
 fn validate_pdf(path: &Path, expected_pages: usize) -> Document {
     assert!(path.exists(), "PDF does not exist: {}", path.display());
-    let doc = Document::load(path).expect("load output PDF");
+    let doc = load_pdf(path, &LoadOptions::none())
+        .expect("load output PDF")
+        .doc;
     assert_eq!(doc.get_pages().len(), expected_pages);
 
     let qpdf_bin = ["qpdf", "/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"]
@@ -68,6 +70,7 @@ fn watermark_all_and_selected_pages_preserves_existing_text() {
     let rep_all = watermark(
         &src,
         &WatermarkOptions {
+            load: LoadOptions::none(),
             text: "CONFIDENTIAL".to_string(),
             position: WatermarkPosition::Diagonal,
             font_size: 48.0,
@@ -97,6 +100,7 @@ fn watermark_all_and_selected_pages_preserves_existing_text() {
     let rep_sub = watermark(
         &src,
         &WatermarkOptions {
+            load: LoadOptions::none(),
             text: "DRAFT COPY".to_string(),
             position: WatermarkPosition::BottomRight,
             font_size: 24.0,
@@ -129,10 +133,12 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let prot_rep = protect(
         &src,
         &ProtectOptions {
-            user_password: "user-pass-123".to_string(),
-            owner_password: Some("owner-pass-456".to_string()),
+            load: LoadOptions::none(),
+            user_password: secrecy::SecretString::from("user-pass-123"),
+            owner_password: Some(secrecy::SecretString::from("owner-pass-456")),
             allow_print: true,
             allow_copy: false,
+            allow_modify: true,
             out: Some(locked_pdf.clone()),
             force: false,
             dry_run: false,
@@ -146,6 +152,15 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     assert!(prot_rep.encrypted);
     assert!(locked_pdf.exists());
 
+    if let Ok(qpdf) = Command::new("qpdf")
+        .args(["--show-encryption", locked_pdf.to_str().unwrap()])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&qpdf.stdout);
+        let stderr = String::from_utf8_lossy(&qpdf.stderr);
+        println!("QPDF STDOUT:\n{stdout}\nQPDF STDERR:\n{stderr}");
+    }
+
     // Confirm `info` reports encrypted = true
     let info_rep =
         info(std::slice::from_ref(&locked_pdf), &NoProgress).expect("info on locked pdf");
@@ -157,7 +172,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let bad_err = unlock(
         &locked_pdf,
         &UnlockOptions {
-            password: "wrong-password".to_string(),
+            password: secrecy::SecretString::from("wrong-password"),
             out: Some(bad_out.clone()),
             force: false,
             dry_run: false,
@@ -176,7 +191,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let unl_rep = unlock(
         &locked_pdf,
         &UnlockOptions {
-            password: "user-pass-123".to_string(),
+            password: secrecy::SecretString::from("user-pass-123"),
             out: Some(unlocked_pdf.clone()),
             force: false,
             dry_run: false,
@@ -192,19 +207,78 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let unlocked_doc = validate_pdf(&unlocked_pdf, 2);
     assert!(!unlocked_doc.is_encrypted());
 
-    // 4. Calling unlock on an unencrypted PDF returns InvalidSelection
-    let plain_err = unlock(
+    // Verify PDFium rendering behavior with password options
+    let rend_no_pw = sheaf_core::render_with_options(
+        &locked_pdf,
+        &sheaf_core::RenderOptions {
+            load: LoadOptions::none(),
+            pages: Some("1".to_string()),
+            scale: sheaf_core::RenderScale::WidthPx(120),
+            out: temp.path().join("thumb_locked_no_pw.png"),
+            force: false,
+            dry_run: true,
+            use_cache: false,
+            cache_dir: None,
+        },
+        &NoProgress,
+    );
+    assert!(matches!(rend_no_pw, Err(SheafError::Encrypted)));
+
+    let rend_wrong_pw = sheaf_core::render_with_options(
+        &locked_pdf,
+        &sheaf_core::RenderOptions {
+            load: LoadOptions {
+                password: Some(secrecy::SecretString::from("wrong")),
+            },
+            pages: Some("1".to_string()),
+            scale: sheaf_core::RenderScale::WidthPx(120),
+            out: temp.path().join("thumb_locked_wrong_pw.png"),
+            force: false,
+            dry_run: true,
+            use_cache: false,
+            cache_dir: None,
+        },
+        &NoProgress,
+    );
+    assert!(matches!(rend_wrong_pw, Err(SheafError::WrongPassword)));
+
+    let rend_ok = sheaf_core::render_with_options(
+        &locked_pdf,
+        &sheaf_core::RenderOptions {
+            load: LoadOptions {
+                password: Some(secrecy::SecretString::from("user-pass-123")),
+            },
+            pages: Some("1".to_string()),
+            scale: sheaf_core::RenderScale::WidthPx(120),
+            out: temp.path().join("thumb_locked_ok.png"),
+            force: false,
+            dry_run: true,
+            use_cache: false,
+            cache_dir: None,
+        },
+        &NoProgress,
+    );
+    assert!(
+        rend_ok.is_ok(),
+        "PDFium failed to render encrypted PDF with user password: {rend_ok:?}"
+    );
+
+    // 4. Calling unlock on an unencrypted PDF succeeds per M10 spec (Exit 0, was_encrypted = false, output is copy)
+    let plain_copy = temp.path().join("plain2.pdf");
+    let plain_rep = unlock(
         &unlocked_pdf,
         &UnlockOptions {
-            password: "any".to_string(),
-            out: Some(temp.path().join("plain2.pdf")),
+            password: secrecy::SecretString::from("any"),
+            out: Some(plain_copy.clone()),
             force: false,
             dry_run: false,
         },
         &NoProgress,
     )
-    .expect_err("unlock on unencrypted pdf");
-    assert!(matches!(plain_err, SheafError::InvalidSelection(_)));
+    .expect("unlock on unencrypted pdf succeeds");
+    assert!(!plain_rep.was_encrypted);
+    assert_eq!(plain_rep.pages, 2);
+    assert!(plain_copy.exists());
 
     // 5. Cancellation check
     let cancel_err = watermark(
