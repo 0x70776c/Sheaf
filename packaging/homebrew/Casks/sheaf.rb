@@ -1,6 +1,6 @@
 cask "sheaf" do
   version "0.1.0"
-  sha256 "1f66aa92c1f03f53f3e7778d9cd4042df0a7a08d71627ed12c04c3c4a49b2853"
+  sha256 "8b3a4cb4afad648c2ccc7e119dd22df474adaab6ad881e70e00294fdcaa7aaad"
 
   url "https://github.com/0x70776c/Sheaf/releases/download/v#{version}/Sheaf-#{version}-universal.dmg"
   name "Sheaf"
