@@ -10,7 +10,6 @@ Sheaf is built from the ground up with a privacy-first guarantee:
 If you discover a potential security vulnerability in Sheaf, please report it privately:
 
 1. **GitHub Security Advisories**: Use the "Report a vulnerability" button under the repository's Security tab on GitHub.
-2. **Email**: If you prefer email, contact the maintainers directly at `security@sheaf.app`.
 
 Please provide:
 - A description of the issue and potential impact
