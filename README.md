@@ -1,52 +1,128 @@
-# Sheaf
+<p align="center">
+  <img src="docs/images/icon-256.png" width="96" height="96" alt="Sheaf Icon" />
+</p>
 
-A fast, minimalist, **100% offline** PDF toolkit for macOS (Apple Silicon & Intel).
-No cloud uploads, no accounts, no telemetry. Original files are never modified.
+<h1 align="center">Sheaf</h1>
 
----
+<p align="center">
+  <strong>Fast, minimalist, 100% offline PDF toolkit for macOS</strong><br />
+  Apple Silicon (arm64) & Intel (x86_64) Universal
+</p>
 
-## Features & Architecture
-
-```
-crates/
-├─ sheaf-core   # Pure PDF manipulation & rendering library (lopdf, pdfium-render), zero UI dependencies
-└─ sheaf-cli    # Agent- and script-friendly CLI (`sheaf`) with JSON envelope & atomic writes
-apps/
-└─ desktop      # Native macOS desktop app (Tauri 2 + Svelte 5 + TypeScript + Vite)
-tests/
-└─ fixtures     # Curated and programmatically generated PDF test fixtures
-```
-
-### Core Principles
-- **100% Offline & Private:** Zero network calls, zero telemetry.
-- **Non-Destructive:** Input files are never overwritten; outputs are written atomically via temporary files in the target directory.
-- **Deterministic CLI Contract:** Every command supports `--json` (emitting a single schema-versioned JSON object on `stdout`), `--dry-run`, `--force`, `--quiet`, `--progress <none|human|json>`, and `--no-color`.
+<p align="center">
+  <a href="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/0x70776c/Sheaf/ci.yml?branch=main&label=CI&style=flat-square" alt="CI" /></a>
+  <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue?style=flat-square" alt="License" /></a>
+  <img src="https://img.shields.io/badge/Version-0.1.0-emerald?style=flat-square" alt="Version 0.1.0" />
+  <img src="https://img.shields.io/badge/macOS-Universal-indigo?style=flat-square" alt="macOS Universal" />
+  <img src="https://img.shields.io/badge/Offline-100%25-green?style=flat-square" alt="100% Offline" />
+</p>
 
 ---
 
-## Quick Start & Setup
+## What is Sheaf?
+
+Sheaf is a privacy-first, ultra-fast PDF manipulation toolkit designed natively for macOS. It exists because manipulating PDFs shouldn't require uploading sensitive tax returns, contracts, or bank statements to third-party web services or subscribing to heavyweight suites.
+
+- **100% Offline:** Zero network calls, zero analytics, zero telemetry. Network dependencies (`reqwest`, `hyper`, `curl`) are actively banned at compile time.
+- **Non-Destructive & Safe:** Input files are strictly read-only. Outputs are written atomically via scratch files to prevent corruption.
+- **Dual Interface:** High-performance automation CLI (`sheaf`) with a strict machine-readable JSON contract, and an elegant native macOS desktop application.
+- **Universal Binary:** Single native download for both Apple Silicon (M1/M2/M3/M4) and Intel Macs.
+
+---
+
+## Installation on macOS (Gatekeeper & Quarantine Guide)
+
+Sheaf is free, open-source software. Because we do not pay for an Apple Developer subscription, pre-built binaries are **ad-hoc signed** and **not notarized by Apple**.
+
+When downloading `.dmg` or `.tar.gz` packages via a web browser, macOS automatically attaches an extended quarantine attribute (`com.apple.quarantine`), and Gatekeeper will block the application with a message such as:
+> *"Sheaf.app is damaged and can't be opened."* or *"macOS cannot verify that this app is free from malware."*
+
+### How to Launch Sheaf:
+
+- **Option A (Finder - Recommended):** Right-click (or `Control` + Click) on `Sheaf.app` in `/Applications`, choose **Open**, and click **Open** in the confirmation dialog. You only need to do this once.
+- **Option B (Terminal Quarantine Removal):**
+  ```bash
+  xattr -d com.apple.quarantine /Applications/Sheaf.app
+  ```
+- **Option C (CLI via Homebrew Tap - No Quarantine):**
+  ```bash
+  brew tap 0x70776c/sheaf packaging/homebrew
+  brew install sheaf
+  ```
+- **Option D (Build from Source):** Building locally from source creates local binaries without quarantine flags.
+
+---
+
+## Verifying Release Artifacts & Integrity
+
+Every Sheaf release includes cryptographic checksums and verifiable GitHub Build Provenance.
+
+### 1. SHA-256 Checksums
+```bash
+# Verify downloaded files against the release checksums
+shasum -a 256 -c SHA256SUMS
+```
+
+### 2. GitHub Build Provenance Attestation
+GitHub Actions signs all release binaries with Sigstore attestations bound to the Sheaf repository.
+```bash
+# Verify provenance using GitHub CLI (gh)
+gh attestation verify Sheaf-0.1.0-universal.dmg --owner 0x70776c
+```
+
+---
+
+## Feature Matrix
+
+| Feature | CLI (`sheaf`) | Desktop App | Notes |
+|---|:---:|:---:|---|
+| **Merge PDFs** | ✅ `sheaf merge` | ✅ | Preserves outline bookmarks hierarchy |
+| **Split PDFs** | ✅ `sheaf split` | ✅ | Ranges, Every N, Bookmarks, Combine |
+| **Page Rotation** | ✅ `sheaf pages rotate` | ✅ | Additive 90°/180°/270° with visual previews |
+| **Page Deletion** | ✅ `sheaf pages delete` | ✅ | Multi-selection removal |
+| **Page Reordering** | ✅ `sheaf pages reorder` | ✅ | Custom sequence specification |
+| **Page Extraction** | ✅ `sheaf pages extract` | ✅ | Save page subsets into new documents |
+| **Rasterize / Render** | ✅ `sheaf render` | ✅ | PNG output with PDFium thumbnail caching |
+| **Compress** | ✅ `sheaf compress` | ✅ | Stream deflate, image downsampling, grayscale |
+| **Convert** | ✅ `sheaf convert` | ✅ | PDF ⇄ PNG/JPEG/TIFF/WebP & PDF ⇄ Markdown |
+| **Watermark** | ✅ `sheaf watermark` | ✅ | Text overlay with rotation, color, opacity |
+| **Page Numbers** | ✅ `sheaf number` | ✅ | Dynamic `{n}` and `{total}` header/footer stamping |
+| **Encryption (Protect)**| ✅ `sheaf protect` | ✅ | AES-256 / AES-128 with print/copy/modify permissions |
+| **Decryption (Unlock)** | ✅ `sheaf unlock` | ✅ | Safe password ingestion (`env`, `file`, `stdin`) |
+| **Metadata Management** | ✅ `sheaf meta` | ✅ | Inspect, modify, or strip Info & XMP streams |
+| **Document Inspection** | ✅ `sheaf info` | ✅ | PDF version, page count, security, dimensions |
+| **Structure Verification**| ✅ `sheaf verify` | — | Embedded validator + optional deep `qpdf` |
+| **Shell Completions** | ✅ `sheaf completions`| — | Bash, Zsh, Fish autocompletion scripts |
+| **JSON Contract** | ✅ `--json` | — | Single envelope object on stdout (`"schema": 1`) |
+
+---
+
+## Reproducible Build from Source
 
 ### Prerequisites
-- **Rust** (stable toolchain, 1.85+ / Edition 2024)
-- **PDFium (`libpdfium.dylib`)** *(used for page rendering and thumbnail generation via `pdfium-render`)*:
-  ```bash
-  mkdir -p vendor/pdfium
-  curl -sSL https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz \
-    | tar -xz -C vendor/pdfium
-  ```
-  *(You can also point `PDFIUM_LIB_PATH` to any custom `libpdfium.dylib` location.)*
-- **qpdf** *(optional, used for deep PDF structural validation via `sheaf verify --deep` and test suites)*:
-  ```bash
-  brew install qpdf
-  ```
+- **Rust** (stable toolchain, 1.85+ / Edition 2024): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- **Node.js** (v20+) & **npm**: `brew install node`
+- **qpdf** *(optional for deep verification)*: `brew install qpdf`
 
-### Build & Run
+### Building Universal Binaries & Packages
 ```bash
 # Clone the repository
 git clone https://github.com/0x70776c/Sheaf.git
 cd Sheaf
 
-# Build CLI release binary
+# Add both macOS compilation targets
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+# Run the automated universal build and packaging script
+./scripts/build-universal.sh
+```
+This script automatically:
+1. Downloads and validates the pinned PDFium binaries with cryptographic SHA-256 verification.
+2. Compiles native release binaries for both `aarch64` and `x86_64`.
+3. Merges them into Universal Binaries using `lipo`.
+4. Creates and ad-hoc signs `dist/Sheaf.app` and `dist/Sheaf-0.1.0-universal.dmg`.
+5. Packages `dist/Sheaf-cli-0.1.0-universal.tar.gz` with bundled completions and universal libraries.
+6. Runs all 7 automated verification checks.
 cargo build --release -p sheaf-cli
 
 # Inspect CLI capabilities
