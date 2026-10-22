@@ -502,7 +502,7 @@ pub fn execute_protect_op(
         }
         "unlock" => {
             let opts = UnlockOptions {
-                password: secrecy::SecretString::from(password.to_string()),
+                password: Some(secrecy::SecretString::from(password.to_string())),
                 out: clean_out,
                 force,
                 dry_run: false,

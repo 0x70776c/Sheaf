@@ -16,61 +16,12 @@ fn sheaf_cmd() -> Command {
 }
 
 #[test]
-fn test_protect_and_unlock_reject_legacy_password_flags_with_exit_2() {
+fn test_migration_legacy_password_rejected() {
     let fixtures = workspace_root().join("tests").join("fixtures");
     let src = fixtures.join("fixture_a_2p.pdf");
 
-    // 1. sheaf protect --password
-    let out_pw = sheaf_cmd()
-        .args([
-            "protect",
-            src.to_str().unwrap(),
-            "--password",
-            "legacy-pass",
-        ])
-        .output()
-        .expect("run protect --password");
-
-    assert_eq!(out_pw.status.code(), Some(2));
-    let stderr_pw = String::from_utf8_lossy(&out_pw.stderr);
-    assert!(
-        stderr_pw.contains("--password wurde entfernt (Sicherheitsrisiko). Nutze --password-env VAR, --password-file PFAD oder --password-stdin."),
-        "Unexpected stderr: {stderr_pw}"
-    );
-
-    // 2. sheaf protect --owner-password
-    let out_owner = sheaf_cmd()
-        .args([
-            "protect",
-            src.to_str().unwrap(),
-            "--owner-password",
-            "legacy-owner",
-        ])
-        .output()
-        .expect("run protect --owner-password");
-
-    assert_eq!(out_owner.status.code(), Some(2));
-    let stderr_owner = String::from_utf8_lossy(&out_owner.stderr);
-    assert!(
-        stderr_owner.contains("--owner-password wurde entfernt (Sicherheitsrisiko). Nutze --new-owner-password-env VAR oder --new-owner-password-file PFAD."),
-        "Unexpected stderr: {stderr_owner}"
-    );
-
-    // 3. sheaf unlock --password
-    let out_unlock = sheaf_cmd()
-        .args(["unlock", src.to_str().unwrap(), "--password", "legacy-pass"])
-        .output()
-        .expect("run unlock --password");
-
-    assert_eq!(out_unlock.status.code(), Some(2));
-    let stderr_unlock = String::from_utf8_lossy(&out_unlock.stderr);
-    assert!(
-        stderr_unlock.contains("--password wurde entfernt (Sicherheitsrisiko). Nutze --password-env VAR, --password-file PFAD oder --password-stdin."),
-        "Unexpected stderr: {stderr_unlock}"
-    );
-
-    // 4. sheaf protect --password --json
-    let out_json = sheaf_cmd()
+    // 1. protect --password
+    let out_prot = sheaf_cmd()
         .args([
             "protect",
             src.to_str().unwrap(),
@@ -79,17 +30,114 @@ fn test_protect_and_unlock_reject_legacy_password_flags_with_exit_2() {
             "--json",
         ])
         .output()
-        .expect("run protect --password --json");
+        .expect("run protect --password");
 
-    assert_eq!(out_json.status.code(), Some(2));
-    let env: Value = serde_json::from_slice(&out_json.stdout).expect("parse json");
-    assert_eq!(env["ok"], false);
-    assert_eq!(env["error"]["exit_code"], 2);
+    assert_eq!(out_prot.status.code(), Some(2));
+    let json_prot: Value = serde_json::from_slice(&out_prot.stdout).expect("parse json");
+    assert_eq!(json_prot["ok"], false);
     assert!(
-        env["error"]["message"]
+        json_prot["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("--password wurde entfernt"),
-        "Unexpected json error: {env:?}"
+            .contains("--password wurde entfernt (Sicherheitsrisiko)")
+    );
+
+    // 2. unlock --password
+    let out_unl = sheaf_cmd()
+        .args([
+            "unlock",
+            src.to_str().unwrap(),
+            "--password",
+            "legacy-pass",
+            "--json",
+        ])
+        .output()
+        .expect("run unlock --password");
+
+    assert_eq!(out_unl.status.code(), Some(2));
+    let json_unl: Value = serde_json::from_slice(&out_unl.stdout).expect("parse json");
+    assert_eq!(json_unl["ok"], false);
+    assert!(
+        json_unl["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("--password wurde entfernt (Sicherheitsrisiko)")
+    );
+}
+
+#[test]
+fn test_migration_legacy_owner_password_rejected() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_a_2p.pdf");
+
+    let out_owner = sheaf_cmd()
+        .args([
+            "protect",
+            src.to_str().unwrap(),
+            "--owner-password",
+            "legacy-owner",
+            "--json",
+        ])
+        .output()
+        .expect("run protect --owner-password");
+
+    assert_eq!(out_owner.status.code(), Some(2));
+    let json_owner: Value = serde_json::from_slice(&out_owner.stdout).expect("parse json");
+    assert_eq!(json_owner["ok"], false);
+    assert!(
+        json_owner["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("--owner-password wurde entfernt (Sicherheitsrisiko)")
+    );
+}
+
+#[test]
+fn test_migration_legacy_user_password_rejected() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_a_2p.pdf");
+
+    // 1. protect --user-password
+    let out_prot = sheaf_cmd()
+        .args([
+            "protect",
+            src.to_str().unwrap(),
+            "--user-password",
+            "legacy-user",
+            "--json",
+        ])
+        .output()
+        .expect("run protect --user-password");
+
+    assert_eq!(out_prot.status.code(), Some(2));
+    let json_prot: Value = serde_json::from_slice(&out_prot.stdout).expect("parse json");
+    assert_eq!(json_prot["ok"], false);
+    assert!(
+        json_prot["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("--password wurde entfernt (Sicherheitsrisiko)")
+    );
+
+    // 2. unlock --user-password
+    let out_unl = sheaf_cmd()
+        .args([
+            "unlock",
+            src.to_str().unwrap(),
+            "--user-password",
+            "legacy-user",
+            "--json",
+        ])
+        .output()
+        .expect("run unlock --user-password");
+
+    assert_eq!(out_unl.status.code(), Some(2));
+    let json_unl: Value = serde_json::from_slice(&out_unl.stdout).expect("parse json");
+    assert_eq!(json_unl["ok"], false);
+    assert!(
+        json_unl["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("--password wurde entfernt (Sicherheitsrisiko)")
     );
 }

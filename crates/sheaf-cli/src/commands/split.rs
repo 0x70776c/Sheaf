@@ -25,19 +25,8 @@ impl Command for SplitArgs {
         let load_opts = sheaf_core::LoadOptions { password: pw };
 
         let mode = if let Some(ref ranges_str) = self.ranges {
-            let info_report = sheaf_core::ops::info::info_with_options(
-                std::slice::from_ref(&self.input),
-                &load_opts,
-                &sheaf_core::NoProgress,
-            )?;
-            let file_info = info_report
-                .files
-                .first()
-                .ok_or(SheafError::EmptySelection)?;
-            if file_info.encrypted && file_info.pages.is_none() {
-                return Err(SheafError::Encrypted);
-            }
-            let total_pages = file_info.pages.unwrap_or(0);
+            let loaded = sheaf_core::load_pdf(&self.input, &load_opts)?;
+            let total_pages = u32::try_from(loaded.doc.get_pages().len()).unwrap_or(0);
             let selection = PageSelection::parse(ranges_str, total_pages)?;
             SplitMode::Ranges {
                 selection,
