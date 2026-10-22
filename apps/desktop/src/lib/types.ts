@@ -21,6 +21,75 @@ export interface PdfMetadataInfo {
   producer: string | null;
 }
 
+export interface PdfDateInfoUi {
+  iso: string | null;
+  raw: string | null;
+}
+
+export interface MetaDatesFieldsUi {
+  creation_date: PdfDateInfoUi;
+  mod_date: PdfDateInfoUi;
+}
+
+export interface MetaXmpInfoUi {
+  present: boolean;
+  in_sync: boolean;
+  packet: string | null;
+}
+
+export interface MetaFileResultUi {
+  path: string;
+  metadata: {
+    title: string | null;
+    author: string | null;
+    subject: string | null;
+    keywords: string | null;
+    creator: string | null;
+    producer: string | null;
+  };
+  dates: MetaDatesFieldsUi;
+  custom: Record<string, string>;
+  xmp: MetaXmpInfoUi;
+  encryption?: EncryptionInfoUi | null;
+}
+
+export interface MetaGetReport {
+  files: MetaFileResultUi[];
+}
+
+export interface MetaDiffEntryUi {
+  field: string;
+  old: string | null;
+  new: string | null;
+}
+
+export interface MetaSetReport {
+  input: string;
+  output: string;
+  diff: MetaDiffEntryUi[];
+  xmp_mode: string;
+  xmp_in_sync: boolean;
+  warnings: string[];
+  dry_run: boolean;
+}
+
+export interface MetaStripRemovedUi {
+  info_keys: string[];
+  xmp: boolean;
+  piece_info: number;
+  object_metadata: number;
+  annotation_fields: number;
+  trailer_id_regenerated: boolean;
+}
+
+export interface MetaStripReport {
+  input: string;
+  output: string;
+  removed: MetaStripRemovedUi;
+  warnings: string[];
+  dry_run: boolean;
+}
+
 export interface EncryptionInfoUi {
   algorithm: string;
   key_bits: number;

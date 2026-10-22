@@ -18,6 +18,7 @@
   import ThumbnailGrid from './lib/components/ThumbnailGrid.svelte';
   import MergeFileList from './lib/components/MergeFileList.svelte';
   import Toast from './lib/components/Toast.svelte';
+  import InfoPanel from './lib/components/InfoPanel.svelte';
   import { TOOLS, basename, formatBytes, getToolById } from './lib/tools';
   import {
     formatSelectedPagesToRanges,
@@ -1988,44 +1989,22 @@
                   </div>
                 {/if}
               {:else if activeTool === 'info' && primaryFile}
-                <div class="info-list">
-                  <div class="info-item">
-                    <span class="field-label">File</span>
-                    <span class="info-val">{basename(primaryFile.path)}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="field-label">Size</span>
-                    <span class="info-val">{formatBytes(primaryFile.size_bytes)}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="field-label">PDF Version</span>
-                    <span class="info-val">{primaryFile.pdf_version ?? 'Unknown'}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="field-label">Pages</span>
-                    <span class="info-val">{primaryFile.pages ?? 'Encrypted'}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="field-label">Outlines</span>
-                    <span class="info-val">
-                      {primaryFile.has_outlines
-                        ? `${primaryFile.outline_count} bookmarks`
-                        : 'None'}
-                    </span>
-                  </div>
-                  {#if primaryFile.metadata?.title}
-                    <div class="info-item">
-                      <span class="field-label">Title</span>
-                      <span class="info-val">{primaryFile.metadata.title}</span>
-                    </div>
-                  {/if}
-                  {#if primaryFile.metadata?.author}
-                    <div class="info-item">
-                      <span class="field-label">Author</span>
-                      <span class="info-val">{primaryFile.metadata.author}</span>
-                    </div>
-                  {/if}
-                </div>
+                <InfoPanel
+                  file={primaryFile}
+                  {sessionPassword}
+                  {isRunning}
+                  onSaveSuccess={(outputPath, noticeTitle, noticeSubtitle) => {
+                    toastNotice = {
+                      title: noticeTitle,
+                      subtitle: noticeSubtitle,
+                      targetPath: outputPath,
+                    };
+                    void loadPaths([outputPath], false);
+                  }}
+                  onRequestPassword={() => {
+                    passwordDialogOpen = true;
+                  }}
+                />
               {:else}
                 <div class="option-group">
                   <span class="field-label">Selected Document</span>
@@ -2475,28 +2454,6 @@
   .small-btn:hover {
     border-color: var(--accent);
     color: var(--text);
-  }
-
-  .info-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-2) var(--space-3);
-    background-color: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-control);
-  }
-
-  .info-val {
-    font-size: 12px;
-    font-weight: 500;
-    word-break: break-all;
   }
 
   .options-footer {
