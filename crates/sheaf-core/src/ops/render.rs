@@ -10,7 +10,7 @@ use image::ImageEncoder;
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use pdfium_render::prelude::*;
 use secrecy::ExposeSecret;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::ensure_not_overwriting_inputs;
@@ -26,6 +26,29 @@ pub const DEFAULT_THUMBNAIL_WIDTH_PX: u32 = 160;
 pub const DEFAULT_RENDER_DPI: u32 = 150;
 
 static PDFIUM_INSTANCE: OnceLock<Result<Pdfium, String>> = OnceLock::new();
+static PDFIUM_RESOLVED_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+/// PDFium library availability and location status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PdfiumStatus {
+    /// Whether a functional PDFium library was discovered and bound.
+    pub found: bool,
+    /// Absolute path to the loaded library, if found.
+    pub path: Option<String>,
+}
+
+/// Probes whether PDFium is available and returns its resolved library path if found.
+pub fn get_pdfium_status() -> PdfiumStatus {
+    let available = get_pdfium().is_ok();
+    let path = PDFIUM_RESOLVED_PATH
+        .get()
+        .and_then(|p| p.as_ref())
+        .map(|p| p.to_string_lossy().to_string());
+    PdfiumStatus {
+        found: available,
+        path,
+    }
+}
 
 /// Scaling mode for rendering PDF pages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,50 +130,68 @@ pub(crate) fn get_pdfium() -> Result<&'static Pdfium, SheafError> {
 }
 
 fn init_pdfium_bindings() -> Result<Pdfium, String> {
-    let mut candidate_dirs: Vec<PathBuf> = Vec::new();
+    let mut candidate_paths: Vec<PathBuf> = Vec::new();
 
+    // 1. PDFIUM_LIB_PATH environment variable
     for env_key in ["PDFIUM_LIB_PATH", "PDFIUM_DYNAMIC_LIB_PATH"] {
         if let Some(val) = std::env::var_os(env_key) {
-            let path = PathBuf::from(val);
-            if path.is_file() {
-                if let Ok(bindings) = Pdfium::bind_to_library(&path) {
-                    return Ok(Pdfium::new(bindings));
-                }
-            } else {
-                candidate_dirs.push(path);
+            let p = PathBuf::from(val);
+            if p.is_file() {
+                candidate_paths.push(p);
+            } else if p.is_dir() {
+                candidate_paths.push(p.join("libpdfium.dylib"));
             }
         }
     }
 
+    // 2. Beside executable, 3. ../lib/, 4. ../Frameworks/ (App-Bundle)
     if let Ok(exe_path) = std::env::current_exe()
         && let Some(exe_dir) = exe_path.parent()
     {
-        candidate_dirs.push(exe_dir.to_path_buf());
-        candidate_dirs.push(exe_dir.join("../Resources/lib"));
-        candidate_dirs.push(exe_dir.join("../Frameworks"));
+        candidate_paths.push(exe_dir.join("libpdfium.dylib"));
+        candidate_paths.push(exe_dir.join("../lib/libpdfium.dylib"));
+        candidate_paths.push(exe_dir.join("../Frameworks/libpdfium.dylib"));
+        candidate_paths.push(exe_dir.join("../Resources/lib/libpdfium.dylib"));
     }
 
-    candidate_dirs.push(PathBuf::from("./"));
-    candidate_dirs.push(PathBuf::from("./vendor/pdfium/lib"));
-    candidate_dirs.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/pdfium/lib"));
-    candidate_dirs.push(PathBuf::from("/opt/homebrew/lib"));
-    candidate_dirs.push(PathBuf::from("/usr/local/lib"));
+    // 5. System paths and fallback
+    candidate_paths.push(PathBuf::from("/opt/homebrew/lib/libpdfium.dylib"));
+    candidate_paths.push(PathBuf::from("/usr/local/lib/libpdfium.dylib"));
+    candidate_paths.push(PathBuf::from("/usr/lib/libpdfium.dylib"));
+    candidate_paths.push(PathBuf::from("./libpdfium.dylib"));
+    candidate_paths.push(PathBuf::from("./vendor/pdfium/lib/libpdfium.dylib"));
+    candidate_paths.push(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/pdfium/lib/libpdfium.dylib"),
+    );
 
-    for dir in candidate_dirs {
-        let lib_path = Pdfium::pdfium_platform_library_name_at_path(&dir);
-        if lib_path.exists()
-            && let Ok(bindings) = Pdfium::bind_to_library(&lib_path)
+    let mut probed: Vec<PathBuf> = Vec::new();
+    for path in candidate_paths {
+        if probed.contains(&path) {
+            continue;
+        }
+        probed.push(path.clone());
+        if path.exists()
+            && let Ok(bindings) = Pdfium::bind_to_library(&path)
         {
+            let _ = PDFIUM_RESOLVED_PATH.set(Some(path));
             return Ok(Pdfium::new(bindings));
         }
     }
 
-    match Pdfium::bind_to_system_library() {
-        Ok(bindings) => Ok(Pdfium::new(bindings)),
-        Err(err) => Err(format!(
-            "PDFium library (libpdfium.dylib) not found ({err}). Set PDFIUM_LIB_PATH or place libpdfium.dylib in vendor/pdfium/lib."
-        )),
+    if let Ok(bindings) = Pdfium::bind_to_system_library() {
+        let _ = PDFIUM_RESOLVED_PATH.set(None);
+        return Ok(Pdfium::new(bindings));
     }
+
+    let _ = PDFIUM_RESOLVED_PATH.set(None);
+    let probe_list = probed
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(format!(
+        "PDFium library (libpdfium.dylib) not found. Searched candidate locations: [{probe_list}]. Set PDFIUM_LIB_PATH or place libpdfium.dylib beside the executable, in ../lib/, or ../Frameworks/."
+    ))
 }
 
 fn map_pdfium_error(err: PdfiumError, path: &Path) -> SheafError {

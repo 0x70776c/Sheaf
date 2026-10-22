@@ -4,6 +4,7 @@ use crate::cli::GlobalArgs;
 use crate::progress::CliProgress;
 
 pub mod capabilities;
+pub mod completions;
 pub mod compress;
 pub mod convert;
 pub mod docs;

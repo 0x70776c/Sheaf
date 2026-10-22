@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install desktop dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build Universal Release Artifacts
+        run: ./scripts/build-universal.sh
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/Sheaf-*-universal.dmg
+            dist/Sheaf-cli-*-universal.tar.gz
+
+      - name: Extract Release Notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Extract section from CHANGELOG.md
+          sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | sed '$d' > RELEASE_NOTES.md || true
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Release ${GITHUB_REF_NAME}" > RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: false
+          body_path: RELEASE_NOTES.md
+          files: |
+            dist/Sheaf-*-universal.dmg
+            dist/Sheaf-cli-*-universal.tar.gz
+            dist/SHA256SUMS

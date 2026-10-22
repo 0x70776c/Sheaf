@@ -27,6 +27,7 @@
 - [`sheaf info`](#sheaf-info)
 - [`sheaf verify`](#sheaf-verify)
 - [`sheaf capabilities`](#sheaf-capabilities)
+- [`sheaf completions`](#sheaf-completions)
 
 ## Global Options
 
@@ -564,6 +565,25 @@ Describe supported commands, flags, exit codes, and external tools
 ```bash
 sheaf capabilities --json
 sheaf capabilities
+```
+
+## `sheaf completions`
+
+Generate shell completion scripts for bash, zsh, fish, elvish, or powershell
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<shell>` | `<SHELL>` | Yes | Target shell to generate completions for (bash, zsh, fish, elvish, powershell) (values: `bash`, `zsh`, `fish`, `elvish`, `powershell`) |
+
+### Examples
+
+```bash
+sheaf completions bash > ~/.local/share/bash-completion/completions/sheaf
+sheaf completions zsh > ~/.zsh/completion/_sheaf
+sheaf completions fish > ~/.config/fish/completions/sheaf.fish
+sheaf completions zsh --json
 ```
 
 

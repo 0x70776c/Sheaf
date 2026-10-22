@@ -182,6 +182,17 @@ pub fn render_clap_error(err: clap::Error, raw_args: &[String]) -> u8 {
         err.kind(),
         clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
     ) {
+        if json_requested && err.kind() == clap::error::ErrorKind::DisplayVersion {
+            let version_info = serde_json::json!({
+                "schema": SCHEMA_VERSION,
+                "version": env!("CARGO_PKG_VERSION"),
+                "commit": env!("SHEAF_GIT_HASH"),
+                "date": env!("SHEAF_GIT_DATE"),
+                "target": env!("SHEAF_TARGET_TRIPLE"),
+            });
+            let _ = writeln!(std::io::stdout(), "{version_info}");
+            return 0;
+        }
         let _ = err.print();
         return 0;
     }

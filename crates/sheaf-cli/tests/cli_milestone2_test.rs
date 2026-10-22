@@ -533,6 +533,8 @@ fn cli_json_envelope_snapshots() {
     let cap_val: Value = serde_json::from_slice(&cap_out.stdout).expect("json");
     insta::assert_json_snapshot!("capabilities_envelope", cap_val, {
         ".duration_ms" => "[duration_ms]",
+        ".data.commit" => "[commit]",
+        ".data.tools.pdfium.path" => "[pdfium_path]",
         ".data.tools.qpdf" => true,
     });
 

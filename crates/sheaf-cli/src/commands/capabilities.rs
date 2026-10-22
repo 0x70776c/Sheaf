@@ -5,9 +5,10 @@ use clap::CommandFactory;
 use sheaf_core::SCHEMA_VERSION;
 use sheaf_core::SheafError;
 use sheaf_core::ops::capabilities::{
-    ArgumentCapability, ArgumentKind, CapabilitiesReport, CommandCapability, ToolAvailability,
-    default_error_codes, default_exit_codes,
+    ArgumentCapability, ArgumentKind, CapabilitiesReport, CommandCapability, PdfiumToolStatus,
+    ToolAvailability, default_error_codes, default_exit_codes,
 };
+use sheaf_core::ops::render::get_pdfium_status;
 use sheaf_core::ops::verify::find_qpdf;
 
 use crate::cli::{CapabilitiesArgs, Cli};
@@ -135,8 +136,11 @@ pub fn generate_capabilities_report() -> CapabilitiesReport {
     let mut commands = Vec::new();
     collect_leaves(&root, "", &mut commands);
 
+    let pdfium_stat = get_pdfium_status();
+
     CapabilitiesReport {
         version: env!("CARGO_PKG_VERSION"),
+        commit: env!("SHEAF_GIT_HASH").to_string(),
         schema: SCHEMA_VERSION,
         global_args,
         commands,
@@ -144,6 +148,10 @@ pub fn generate_capabilities_report() -> CapabilitiesReport {
         error_codes: default_error_codes(),
         tools: ToolAvailability {
             qpdf: find_qpdf().is_some(),
+            pdfium: PdfiumToolStatus {
+                found: pdfium_stat.found,
+                path: pdfium_stat.path,
+            },
         },
     }
 }

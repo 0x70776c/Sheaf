@@ -12,6 +12,7 @@
     onSelectTool: (tool: ToolId) => void;
     onOpenFiles: () => void;
     onSelectTheme: (theme: ThemePreference) => void;
+    onOpenAbout?: () => void;
   }
 
   let {
@@ -22,6 +23,7 @@
     onSelectTool,
     onOpenFiles,
     onSelectTheme,
+    onOpenAbout,
   }: Props = $props();
 
   let query = $state('');
@@ -33,7 +35,7 @@
     label: string;
     subtitle: string;
     shortcut?: string;
-    kind: 'tool' | 'open' | 'theme';
+    kind: 'tool' | 'open' | 'theme' | 'about';
     toolId?: ToolId;
     themeValue?: ThemePreference;
   }
@@ -53,6 +55,12 @@
       subtitle: 'Choose one or more local PDF files from disk',
       shortcut: '⌘O',
       kind: 'open',
+    },
+    {
+      id: 'action:about',
+      label: 'About Sheaf…',
+      subtitle: 'Version 0.1.0, offline privacy statement and licenses',
+      kind: 'about',
     },
     {
       id: 'theme:system',
@@ -103,6 +111,8 @@
       onSelectTool(entry.toolId);
     } else if (entry.kind === 'open') {
       onOpenFiles();
+    } else if (entry.kind === 'about') {
+      onOpenAbout?.();
     } else if (entry.kind === 'theme' && entry.themeValue) {
       onSelectTheme(entry.themeValue);
     }

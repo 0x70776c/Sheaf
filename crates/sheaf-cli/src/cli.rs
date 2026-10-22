@@ -45,12 +45,16 @@ pub struct GlobalArgs {
     /// Disable colored console output (also respects NO_COLOR)
     #[arg(long, global = true)]
     pub no_color: bool,
+
+    /// Hidden trigger to test the panic hook
+    #[arg(long, hide = true, global = true)]
+    pub test_panic: bool,
 }
 
 #[derive(Debug, Parser)]
 #[command(
     name = "sheaf",
-    version,
+    version = concat!(env!("CARGO_PKG_VERSION"), " (commit ", env!("SHEAF_GIT_HASH"), " ", env!("SHEAF_GIT_DATE"), ")"),
     about = "Fast, 100% offline PDF toolkit for macOS",
     after_help = "Examples:\n  sheaf merge a.pdf b.pdf -o combined.pdf\n  sheaf split report.pdf --ranges \"1-3,8-\" -o out/\n  sheaf pages rotate report.pdf --pages \"1-3\" --degrees 90 -o rotated.pdf\n  sheaf info report.pdf --json"
 )]
@@ -141,6 +145,12 @@ pub enum Commands {
     /// Describe supported commands, flags, exit codes, and external tools
     #[command(after_help = "Examples:\n  sheaf capabilities --json\n  sheaf capabilities")]
     Capabilities(CapabilitiesArgs),
+
+    /// Generate shell completion scripts for bash, zsh, fish, elvish, or powershell
+    #[command(
+        after_help = "Examples:\n  sheaf completions bash > ~/.local/share/bash-completion/completions/sheaf\n  sheaf completions zsh > ~/.zsh/completion/_sheaf\n  sheaf completions fish > ~/.config/fish/completions/sheaf.fish\n  sheaf completions zsh --json"
+    )]
+    Completions(CompletionsArgs),
 
     /// Generate Markdown documentation for all commands (internal)
     #[command(hide = true)]
@@ -797,6 +807,27 @@ pub struct VerifyArgs {
 
 #[derive(Debug, Clone, Default, Args)]
 pub struct CapabilitiesArgs {}
+
+/// Arguments for `sheaf completions`.
+#[derive(Debug, Clone, Args)]
+pub struct CompletionsArgs {
+    /// Target shell to generate completions for (bash, zsh, fish, elvish, powershell)
+    #[arg(value_enum)]
+    pub shell: ShellChoice,
+}
+
+/// Supported shell dialects for tab completion.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum ShellChoice {
+    Bash,
+    Zsh,
+    Fish,
+    Elvish,
+    Powershell,
+}
 
 #[derive(Debug, Clone, Default, Args)]
 pub struct DocsArgs {}

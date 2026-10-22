@@ -6,34 +6,78 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   check:
-    name: Format, Clippy & Test
-    runs-on: macos-latest
+    name: Lint & License Check
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Install qpdf for PDF validation
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: Check code formatting
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Check licenses and banned network dependencies
+        run: cargo deny check licenses bans
+
+  test-rust:
+    name: Rust Tests & Smoke Tests
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install qpdf
         run: brew install qpdf
-      - name: Download PDFium binary for macOS
+      - name: Setup Universal PDFium
         run: |
           mkdir -p vendor/pdfium
-          curl -sL "https://github.com/bblanchon/pdfium-binaries/releases/latest/download/pdfium-mac-arm64.tgz" | tar -xzf - -C vendor/pdfium
-      - name: Setup Node & Build Desktop Frontend
+          curl -sSL "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/8111/pdfium-mac-arm64.tgz" | tar -xz -C vendor/pdfium
+      - name: Run all workspace tests
+        run: cargo test --workspace
+      - name: Build CLI release for 500-page smoke run
+        run: cargo build --release -p sheaf-cli
+      - name: 500-page PDF smoke test (info)
+        run: /usr/bin/time -l ./target/release/sheaf info tests/fixtures/fixture_500p.pdf
+      - name: 500-page PDF smoke test (split)
+        run: /usr/bin/time -l ./target/release/sheaf split tests/fixtures/fixture_500p.pdf --every 50 -o /tmp/smoke_split --force
+      - name: 500-page PDF smoke test (render)
+        run: /usr/bin/time -l ./target/release/sheaf render tests/fixtures/fixture_500p.pdf --pages 1-20 -o /tmp/smoke_render --force
+
+  test-desktop:
+    name: Desktop Frontend Build
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Install dependencies & build
         working-directory: apps/desktop
         run: |
           npm ci
           npm run check
           npm run build
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Run tests
-        run: cargo test --workspace
+
+  verify-docs:
+    name: Documentation Sync Check
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Verify CLI documentation sync
+        run: cargo test -p sheaf-cli --test docs_sync_test

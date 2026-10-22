@@ -1,7 +1,34 @@
-/target
-/vendor/pdfium
-apps/desktop/node_modules
-apps/desktop/dist
-apps/desktop/src-tauri/gen
+# Rust
+/target/
 **/*.rs.bk
+
+# Node / Tauri
+node_modules/
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# PDFium und Build-Ausgaben
+/vendor/pdfium/
+/dist/
+*.dylib
+*.dmg
+*.app/
+*.tar.gz
+
+# Tests
+*.snap.new
+tests/fixtures/generated/
+
+# macOS / Editor
 .DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Lokal/Secrets
+.env
+.env.*
+*.p12
+*.pem
+*.key

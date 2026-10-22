@@ -1,0 +1,39 @@
+[graph]
+targets = [
+    { triple = "aarch64-apple-darwin" },
+    { triple = "x86_64-apple-darwin" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "CC0-1.0",
+    "Unicode-3.0",
+    "Zlib",
+    "MPL-2.0",
+]
+exceptions = []
+
+[licenses.private]
+ignore = false
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+deny = [
+    { name = "reqwest" },
+    { name = "hyper" },
+    { name = "tokio-tungstenite" },
+    { name = "curl" },
+]
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-git = []
