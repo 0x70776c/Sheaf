@@ -34,9 +34,9 @@ pub use ops::info::{
 };
 pub use ops::merge::{MergeOptions, MergeReport, merge, merge_with_options};
 pub use ops::meta::{
-    MetaDatesFields, MetaFileResult, MetaGetOptions, MetaGetReport, MetaInfoFields, MetaXmpInfo,
-    PdfDateInfo, decode_pdf_string, encode_pdf_string, format_iso_date, format_pdf_date, meta_get,
-    parse_pdf_date,
+    MetaDatesFields, MetaDiffEntry, MetaFileResult, MetaGetOptions, MetaGetReport, MetaInfoFields,
+    MetaSetOptions, MetaSetReport, MetaXmpInfo, PdfDateInfo, XmpMode, decode_pdf_string,
+    encode_pdf_string, format_iso_date, format_pdf_date, meta_get, meta_set, parse_pdf_date,
 };
 pub use ops::number::{NumberOptions, NumberPosition, NumberReport, format_page_number, number};
 pub use ops::overlay::{
