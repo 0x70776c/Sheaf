@@ -154,6 +154,7 @@
   // Transient Session Password & Prompt State (never saved to localStorage / disk)
   let sessionPassword = $state<string | null>(null);
   let passwordDialogOpen = $state(false);
+  let aboutDialogOpen = $state(false);
   let passwordPromptInput = $state('');
   let passwordPromptError = $state<string | null>(null);
   let passwordPromptAttempts = $state(0);
@@ -2092,6 +2093,9 @@
     onSelectTheme={(nextTheme) => {
       theme = nextTheme;
     }}
+    onOpenAbout={() => {
+      aboutDialogOpen = true;
+    }}
   />
 
   {#if passwordDialogOpen}
@@ -2165,6 +2169,43 @@
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  {/if}
+
+  {#if aboutDialogOpen}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="pw-modal-backdrop" onclick={() => { aboutDialogOpen = false; }}>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="pw-modal-card about-modal-card" onclick={(e) => e.stopPropagation()}>
+        <div class="about-modal-content">
+          <img src="/icon.png" alt="Sheaf Icon" class="about-icon" width="80" height="80" />
+          <h2 class="about-title">Sheaf</h2>
+          <span class="about-version">Version 0.1.0</span>
+          <p class="about-desc">
+            Fast, offline-first PDF workbench for macOS.
+          </p>
+          <div class="about-badges">
+            <span class="about-badge">100% Offline</span>
+            <span class="about-badge">No Telemetry</span>
+            <span class="about-badge">MIT / Apache 2.0</span>
+          </div>
+          <p class="about-note">
+            Built with Rust, Tauri 2, Svelte 5, lopdf, and PDFium.
+          </p>
+        </div>
+        <div class="pw-modal-actions" style="justify-content: center; margin-top: 16px;">
+          <button
+            type="button"
+            class="primary-action-btn"
+            style="min-width: 100px;"
+            onclick={() => { aboutDialogOpen = false; }}
+          >
+            Schließen
+          </button>
+        </div>
       </div>
     </div>
   {/if}
@@ -2729,5 +2770,62 @@
 
   .modal-submit {
     padding: var(--space-2) var(--space-4);
+  }
+
+  .about-modal-card {
+    text-align: center;
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .about-modal-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .about-icon {
+    border-radius: 18px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    margin-bottom: 4px;
+  }
+
+  .about-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .about-version {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .about-desc {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .about-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .about-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .about-note {
+    margin: 8px 0 0;
+    font-size: 11px;
+    color: var(--text-muted);
   }
 </style>
