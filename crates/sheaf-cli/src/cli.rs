@@ -197,6 +197,37 @@ pub struct PagesArgs {
     pub action: PagesSubcommand,
 }
 
+/// Value parser for `--degrees`.
+///
+/// Parses any integer so that semantic validation stays in `sheaf-core`
+/// (stable error code `invalid_selection`), but advertises the supported
+/// values for `--help`, shell completion and `sheaf capabilities`.
+#[derive(Debug, Clone, Copy)]
+pub struct RotationDegreesParser;
+
+impl clap::builder::TypedValueParser for RotationDegreesParser {
+    type Value = i32;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        clap::value_parser!(i32).parse_ref(cmd, arg, value)
+    }
+
+    fn possible_values(
+        &self,
+    ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+        Some(Box::new(
+            ["90", "180", "270", "-90"]
+                .into_iter()
+                .map(clap::builder::PossibleValue::new),
+        ))
+    }
+}
+
 #[derive(Debug, Clone, Subcommand)]
 pub enum PagesSubcommand {
     /// Rotate selected pages (or all pages) additively by 90, 180, or 270 degrees
@@ -237,7 +268,11 @@ pub struct PagesRotateArgs {
     pub pages: Option<String>,
 
     /// Clockwise rotation angle in degrees (90, 180, 270, or -90)
-    #[arg(long, allow_hyphen_values = true)]
+    #[arg(
+        long,
+        allow_hyphen_values = true,
+        value_parser = RotationDegreesParser
+    )]
     pub degrees: i32,
 
     /// Target output PDF file (defaults to {stem}_rotated.pdf)

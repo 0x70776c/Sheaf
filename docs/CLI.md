@@ -7,10 +7,16 @@
 
 - [`sheaf merge`](#sheaf-merge)
 - [`sheaf split`](#sheaf-split)
-- [`sheaf pages`](#sheaf-pages)
+- [`sheaf pages rotate`](#sheaf-pages-rotate)
+- [`sheaf pages delete`](#sheaf-pages-delete)
+- [`sheaf pages reorder`](#sheaf-pages-reorder)
+- [`sheaf pages extract`](#sheaf-pages-extract)
 - [`sheaf render`](#sheaf-render)
 - [`sheaf compress`](#sheaf-compress)
-- [`sheaf convert`](#sheaf-convert)
+- [`sheaf convert to-images`](#sheaf-convert-to-images)
+- [`sheaf convert from-images`](#sheaf-convert-from-images)
+- [`sheaf convert to-markdown`](#sheaf-convert-to-markdown)
+- [`sheaf convert from-markdown`](#sheaf-convert-from-markdown)
 - [`sheaf watermark`](#sheaf-watermark)
 - [`sheaf number`](#sheaf-number)
 - [`sheaf protect`](#sheaf-protect)
@@ -23,15 +29,15 @@
 
 These options are supported across all `sheaf` subcommands:
 
-| Option | Description |
-| :--- | :--- |
-| `--json` | Output a single JSON envelope object on stdout |
-| `--dry-run` | Validate inputs and compute execution plan without writing files |
-| `--force` | Overwrite existing output files |
-| `-q, --quiet` | Suppress human-readable output except errors |
-| `-v, --verbose` | Emit verbose debug logs on stderr |
-| `--progress <MODE>` | Progress output mode on stderr (`none`, `human`, `json`) |
-| `--no-color` | Disable colored console output (also respects `NO_COLOR`) |
+| Option | Value | Description |
+| :--- | :--- | :--- |
+| `--json` | - | Output a single JSON envelope object on stdout (values: `true`, `false`) |
+| `--dry-run` | - | Validate inputs and compute execution plan without writing any files (values: `true`, `false`) |
+| `--force` | - | Overwrite existing output files (values: `true`, `false`) |
+| `-q, --quiet` | - | Suppress human-readable output except errors (values: `true`, `false`) |
+| `-v, --verbose` | - | Emit verbose debug logs on stderr (values: `true`, `false`) |
+| `--progress` | `<PROGRESS>` | Progress output mode on stderr (default: human on TTY, otherwise none) (values: `none`, `human`, `json`) |
+| `--no-color` | - | Disable colored console output (also respects NO_COLOR) (values: `true`, `false`) |
 
 ## `sheaf merge`
 
@@ -44,7 +50,7 @@ Merge multiple PDF files into a single output PDF
 | `<inputs>` | `<INPUTS>` | Yes | Input PDF files in the desired merge order |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 | `-o, --out` | `<OUT>` | Yes | Target output PDF file |
 
 ### Examples
@@ -65,11 +71,11 @@ Split a PDF file by page ranges, fixed chunks, or bookmark levels
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 | `--ranges` | `<RANGES>` | No | Page ranges to split (e.g. "1-3,5,8-") |
 | `--every` | `<EVERY>` | No | Split every N pages |
 | `--bookmarks-level` | `<BOOKMARKS_LEVEL>` | No | Split by bookmarks at hierarchy level N (1 = top level) |
-| `--combine` | `<COMBINE>` | No | Combine selected page ranges into a single PDF file (only valid with --ranges) |
+| `--combine` | - | No | Combine selected page ranges into a single PDF file (only valid with --ranges) (values: `true`, `false`) |
 | `-o, --out` | `<OUT>` | No | Output directory for generated PDF files (defaults to input file directory) |
 
 ### Examples
@@ -80,22 +86,93 @@ sheaf split report.pdf --every 2 -o out/
 sheaf split report.pdf --bookmarks-level 1 -o out/ --json
 ```
 
-## `sheaf pages`
+## `sheaf pages rotate`
 
-Page-level operations: rotate, delete, reorder, or extract pages
+Rotate selected pages (or all pages) additively by 90, 180, or 270 degrees
 
 ### Options & Arguments
 
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--pages` | `<PAGES>` | No | Page ranges to rotate (e.g. "1-3,5"; omit to rotate all pages) |
+| `--degrees` | `<DEGREES>` | Yes | Clockwise rotation angle in degrees (90, 180, 270, or -90) (values: `90`, `180`, `270`, `-90`) |
+| `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_rotated.pdf) |
 
 ### Examples
 
 ```bash
-sheaf pages rotate report.pdf --pages "1-3" --degrees 90 -o rotated.pdf
-sheaf pages delete report.pdf --pages "2,5-7" -o cleaned.pdf
-sheaf pages reorder report.pdf --order "3,1,2,4-" -o reordered.pdf
-sheaf pages extract report.pdf --pages "1,4-6" -o subset.pdf
+sheaf pages rotate input.pdf --degrees 90 -o rotated.pdf
+sheaf pages rotate input.pdf --pages "1,3-5" --degrees 180 -o rotated.pdf --json
+```
+
+## `sheaf pages delete`
+
+Delete selected pages from a PDF file
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--pages` | `<PAGES>` | Yes | Page ranges to delete (e.g. "2,5-7") |
+| `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_deleted.pdf) |
+
+### Examples
+
+```bash
+sheaf pages delete input.pdf --pages "2,4-6" -o out.pdf
+sheaf pages delete input.pdf --pages "1" -o without_cover.pdf --json
+```
+
+## `sheaf pages reorder`
+
+Reorder pages according to a page range sequence
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--order` | `<ORDER>` | Yes | New page order specification (e.g. "3,1,2,4-") |
+| `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_reordered.pdf) |
+
+### Examples
+
+```bash
+sheaf pages reorder input.pdf --order "3,1,2,4-" -o reordered.pdf
+sheaf pages reorder input.pdf --order "2,1" -o swapped.pdf --json
+```
+
+## `sheaf pages extract`
+
+Extract selected pages into a new PDF file
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--pages` | `<PAGES>` | Yes | Page ranges to extract into a new PDF (e.g. "1-3,5") |
+| `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_extracted.pdf) |
+
+### Examples
+
+```bash
+sheaf pages extract input.pdf --pages "1-3,8" -o extracted.pdf
+sheaf pages extract input.pdf --pages "5-" -o tail.pdf --json
 ```
 
 ## `sheaf render`
@@ -109,12 +186,12 @@ Render PDF pages to PNG images or thumbnails
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 | `--page` | `<PAGE>` | No | Single 1-based page number to render |
 | `--pages` | `<PAGES>` | No | Page ranges to render (e.g. "1-3,5,8-"; omit both --page and --pages to render all pages) |
 | `--dpi` | `<DPI>` | No | Target resolution in dots per inch (default: 150 DPI if --width is not set) |
 | `--width` | `<WIDTH>` | No | Target width in pixels (aspect ratio preserved; uses on-disk thumbnail cache by default) |
-| `--no-cache` | `<NO_CACHE>` | No | Disable the on-disk thumbnail cache when rendering by --width |
+| `--no-cache` | - | No | Disable the on-disk thumbnail cache when rendering by --width (values: `true`, `false`) |
 | `-o, --out` | `<OUT>` | No | Output PNG file (when rendering a single page) or output directory |
 
 ### Examples
@@ -135,9 +212,9 @@ Compress a PDF file by optimizing streams, deduplicating objects, and resampling
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
-| `--preset` | `<PRESET>` | No | Compression preset: low (220 DPI, JPEG 85), medium (150 DPI, JPEG 70), or high (100 DPI, JPEG 55) |
-| `--grayscale` | `<GRAYSCALE>` | No | Convert embedded images to grayscale |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--preset` | `<PRESET>` | No | Compression preset: low (220 DPI, JPEG 85), medium (150 DPI, JPEG 70), or high (100 DPI, JPEG 55) (default: `medium`) |
+| `--grayscale` | - | No | Convert embedded images to grayscale (values: `true`, `false`) |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_compressed.pdf) |
 
 ### Examples
@@ -147,22 +224,91 @@ sheaf compress report.pdf --preset medium -o report_compressed.pdf
 sheaf compress scan.pdf --preset high --grayscale -o scan_small.pdf --json
 ```
 
-## `sheaf convert`
+## `sheaf convert to-images`
 
-Convert between PDF, images (PNG/JPG), and Markdown (.md)
+Export PDF pages as PNG or JPG images
 
 ### Options & Arguments
 
 | Option / Argument | Value | Required | Description |
 | :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--format` | `<FORMAT>` | No | Output image format: png or jpg (default: `png`) |
+| `--dpi` | `<DPI>` | No | Target resolution in dots per inch (18..=1200) (default: `150`) |
+| `--quality` | `<QUALITY>` | No | JPEG quality (1..=100; used when --format is jpg) (default: `85`) |
+| `--pages` | `<PAGES>` | No | Optional 1-based page ranges to export (omit to export all pages) |
+| `-o, --out` | `<OUT>` | No | Output directory (defaults to {stem}_images/) |
 
 ### Examples
 
 ```bash
 sheaf convert to-images report.pdf --format png --dpi 150 -o images/
-sheaf convert from-images page1.png page2.jpg --page-size a4 -o combined.pdf
+sheaf convert to-images report.pdf --format jpg --dpi 300 --quality 90 --pages "1-5" -o jpg_out/ --json
+```
+
+## `sheaf convert from-images`
+
+Combine PNG/JPG images into a multi-page PDF
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<inputs>` | `<INPUTS>` | Yes | Input image files (PNG, JPG/JPEG) in page order |
+| `--page-size` | `<PAGE_SIZE>` | No | Target page size: fit (match image dimensions), a4, or letter (default: `fit`) |
+| `--margin` | `<MARGIN>` | No | Page margin in PDF points (0..=200) (default: `0`) |
+| `-o, --out` | `<OUT>` | Yes | Target output PDF file |
+
+### Examples
+
+```bash
+sheaf convert from-images scan1.png scan2.png -o scans.pdf
+sheaf convert from-images photo1.jpg photo2.jpg --page-size a4 --margin 36 -o album.pdf --json
+```
+
+## `sheaf convert to-markdown`
+
+Extract structured Markdown (.md) from a PDF document
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--pages` | `<PAGES>` | No | Optional 1-based page ranges to extract (omit to extract all pages) |
+| `-o, --out` | `<OUT>` | No | Target output Markdown file (defaults to {stem}.md) |
+
+### Examples
+
+```bash
 sheaf convert to-markdown report.pdf -o report.md
-sheaf convert from-markdown notes.md --page-size a4 -o notes.pdf --json
+sheaf convert to-markdown book.pdf --pages "1-10" -o chapter1.md --json
+```
+
+## `sheaf convert from-markdown`
+
+Render a Markdown (.md) document into a multi-page vector PDF
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input Markdown (.md) file |
+| `--page-size` | `<PAGE_SIZE>` | No | Target page size: a4 or letter (default: `a4`) |
+| `--margin` | `<MARGIN>` | No | Page margin in PDF points (18..=144) (default: `54`) |
+| `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}.pdf) |
+
+### Examples
+
+```bash
+sheaf convert from-markdown README.md -o README.pdf
+sheaf convert from-markdown notes.md --page-size letter --margin 54 -o notes.pdf --json
 ```
 
 ## `sheaf watermark`
@@ -176,13 +322,13 @@ Add a customizable text watermark to PDF pages
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 | `--text` | `<TEXT>` | Yes | Text to stamp as a watermark |
-| `--position` | `<POSITION>` | No | Watermark placement: diagonal, center, top-left, top-right, bottom-left, or bottom-right |
-| `--font-size` | `<FONT_SIZE>` | No | Font size in PDF points (6..=300) |
-| `--opacity` | `<OPACITY>` | No | Opacity between 0.05 and 1.0 |
+| `--position` | `<POSITION>` | No | Watermark placement: diagonal, center, top-left, top-right, bottom-left, or bottom-right (default: `diagonal`) |
+| `--font-size` | `<FONT_SIZE>` | No | Font size in PDF points (6..=300) (default: `48`) |
+| `--opacity` | `<OPACITY>` | No | Opacity between 0.05 and 1.0 (default: `0.25`) |
 | `--rotation` | `<ROTATION>` | No | Optional explicit rotation angle in degrees (overrides position default) |
-| `--color` | `<COLOR>` | No | Color as #RRGGBB hex or preset name (gray, red, blue, black, green) |
+| `--color` | `<COLOR>` | No | Color as #RRGGBB hex or preset name (gray, red, blue, black, green) (default: `#6B7280`) |
 | `--pages` | `<PAGES>` | No | Optional 1-based page ranges to watermark (omit to watermark all pages) |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_watermarked.pdf) |
 
@@ -204,14 +350,14 @@ Stamp customizable page numbers onto PDF pages
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
-| `--format` | `<FORMAT>` | No | Page number format template supporting {n}, {total}, {page}, and {pages} |
-| `--position` | `<POSITION>` | No | Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left |
-| `--start` | `<START>` | No | Starting sequence number for {n} on the first selected page |
-| `--font-size` | `<FONT_SIZE>` | No | Font size in PDF points (6..=300) |
-| `--opacity` | `<OPACITY>` | No | Opacity between 0.05 and 1.0 |
-| `--color` | `<COLOR>` | No | Color as #RRGGBB hex or preset name (gray, red, blue, black, green) |
-| `--margin` | `<MARGIN>` | No | Margin inset from page edges in PDF points (0..=200) |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--format` | `<FORMAT>` | No | Page number format template supporting {n}, {total}, {page}, and {pages} (default: `{n} / {total}`) |
+| `--position` | `<POSITION>` | No | Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left (default: `bottom-center`) |
+| `--start` | `<START>` | No | Starting sequence number for {n} on the first selected page (default: `1`) |
+| `--font-size` | `<FONT_SIZE>` | No | Font size in PDF points (6..=300) (default: `11`) |
+| `--opacity` | `<OPACITY>` | No | Opacity between 0.05 and 1.0 (default: `1`) |
+| `--color` | `<COLOR>` | No | Color as #RRGGBB hex or preset name (gray, red, blue, black, green) (default: `#111827`) |
+| `--margin` | `<MARGIN>` | No | Margin inset from page edges in PDF points (0..=200) (default: `28`) |
 | `--pages` | `<PAGES>` | No | Optional 1-based page ranges to number (omit to number all pages) |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_numbered.pdf) |
 
@@ -233,15 +379,15 @@ Password-protect (encrypt) a PDF file
 | `<input>` | `<INPUT>` | Yes | Input PDF file |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 | `--new-password-env` | `<NEW_PASSWORD_ENV>` | No | Read the new user password from an environment variable |
 | `--new-password-file` | `<NEW_PASSWORD_FILE>` | No | Read the new user password from a file |
-| `--new-password-stdin` | `<NEW_PASSWORD_STDIN>` | No | Read the new user password from standard input |
+| `--new-password-stdin` | - | No | Read the new user password from standard input (values: `true`, `false`) |
 | `--new-owner-password-env` | `<NEW_OWNER_PASSWORD_ENV>` | No | Read the optional new owner password from an environment variable |
 | `--new-owner-password-file` | `<NEW_OWNER_PASSWORD_FILE>` | No | Read the optional new owner password from a file |
-| `--no-print` | `<NO_PRINT>` | No | Disallow printing the protected PDF |
-| `--no-copy` | `<NO_COPY>` | No | Disallow copying text and graphics from the protected PDF |
-| `--no-modify` | `<NO_MODIFY>` | No | Disallow modifying contents, annotations, and forms in the protected PDF |
+| `--no-print` | - | No | Disallow printing the protected PDF (values: `true`, `false`) |
+| `--no-copy` | - | No | Disallow copying text and graphics from the protected PDF (values: `true`, `false`) |
+| `--no-modify` | - | No | Disallow modifying contents, annotations, and forms in the protected PDF (values: `true`, `false`) |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_protected.pdf) |
 
 ### Examples
@@ -262,7 +408,7 @@ Remove password protection (decrypt) from an encrypted PDF file
 | `<input>` | `<INPUT>` | Yes | Encrypted input PDF file |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_unlocked.pdf) |
 
 ### Examples
@@ -283,7 +429,7 @@ Inspect structural properties and metadata of PDF files
 | `<files>` | `<FILES>` | Yes | PDF files to inspect |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 
 ### Examples
 
@@ -303,8 +449,8 @@ Verify PDF files for structural integrity
 | `<files>` | `<FILES>` | Yes | PDF files to verify |
 | `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
-| `--password-stdin` | `<PASSWORD_STDIN>` | No | Read the open password from standard input |
-| `--deep` | `<DEEP>` | No | Also run qpdf --check if installed |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+| `--deep` | - | No | Also run qpdf --check if installed (values: `true`, `false`) |
 
 ### Examples
 
