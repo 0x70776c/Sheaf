@@ -370,7 +370,9 @@ sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right -
 
 ## `sheaf protect`
 
-Password-protect (encrypt) a PDF file
+Password-protect (encrypt) a PDF file.
+
+Hinweis: --no-print, --no-copy, --no-modify sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort.
 
 ### Options & Arguments
 
@@ -385,10 +387,15 @@ Password-protect (encrypt) a PDF file
 | `--new-password-stdin` | - | No | Read the new user password from standard input (values: `true`, `false`) |
 | `--new-owner-password-env` | `<NEW_OWNER_PASSWORD_ENV>` | No | Read the optional new owner password from an environment variable |
 | `--new-owner-password-file` | `<NEW_OWNER_PASSWORD_FILE>` | No | Read the optional new owner password from a file |
-| `--no-print` | - | No | Disallow printing the protected PDF (values: `true`, `false`) |
-| `--no-copy` | - | No | Disallow copying text and graphics from the protected PDF (values: `true`, `false`) |
-| `--no-modify` | - | No | Disallow modifying contents, annotations, and forms in the protected PDF (values: `true`, `false`) |
+| `--no-print` | - | No | Disallow printing the protected PDF (Hinweis an den Viewer) (values: `true`, `false`) |
+| `--no-copy` | - | No | Disallow copying text and graphics from the protected PDF (Hinweis an den Viewer) (values: `true`, `false`) |
+| `--no-modify` | - | No | Disallow modifying contents, annotations, and forms in the protected PDF (Hinweis an den Viewer) (values: `true`, `false`) |
 | `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_protected.pdf) |
+
+### Notes
+
+- Hinweis:
+- --no-print, --no-copy, --no-modify sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort.
 
 ### Examples
 

@@ -114,7 +114,8 @@ pub enum Commands {
 
     /// Password-protect (encrypt) a PDF file
     #[command(
-        after_help = "Examples:\n  sheaf protect report.pdf --new-password-env PDF_PASS -o protected.pdf\n  sheaf protect contract.pdf --new-password-file /path/to/pw --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf --json"
+        long_about = "Password-protect (encrypt) a PDF file.\n\nHinweis: --no-print, --no-copy, --no-modify sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort.",
+        after_help = "Examples:\n  sheaf protect report.pdf --new-password-env PDF_PASS -o protected.pdf\n  sheaf protect contract.pdf --new-password-file /path/to/pw --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf --json\n\nHinweis:\n  --no-print, --no-copy, --no-modify sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort."
     )]
     Protect(ProtectArgs),
 
@@ -610,15 +611,15 @@ pub struct ProtectArgs {
     #[command(flatten)]
     pub new_password: NewPasswordArgs,
 
-    /// Disallow printing the protected PDF
+    /// Disallow printing the protected PDF (Hinweis an den Viewer)
     #[arg(long)]
     pub no_print: bool,
 
-    /// Disallow copying text and graphics from the protected PDF
+    /// Disallow copying text and graphics from the protected PDF (Hinweis an den Viewer)
     #[arg(long)]
     pub no_copy: bool,
 
-    /// Disallow modifying contents, annotations, and forms in the protected PDF
+    /// Disallow modifying contents, annotations, and forms in the protected PDF (Hinweis an den Viewer)
     #[arg(long)]
     pub no_modify: bool,
 

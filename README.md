@@ -228,14 +228,16 @@ sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right -
 ---
 
 ### 9. `sheaf protect` & `sheaf unlock`
-Encrypt (`protect`) a PDF with user/owner passwords and print/copy permissions, or decrypt (`unlock`) an encrypted PDF (returns exit code `4` with `"code": "wrong_password"` if the password is incorrect).
+Encrypt (`protect`) a PDF with user/owner passwords and print/copy/modify permissions, or decrypt (`unlock`) an encrypted PDF (returns exit code `4` with `"code": "wrong_password"` if the password is incorrect). Passwords are never passed via command-line arguments, but via environment variables, files, or stdin.
+
+> **Hinweis:** `--no-print`, `--no-copy`, `--no-modify` sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort.
 
 ```bash
-# Encrypt a PDF with user and owner passwords
-sheaf protect contract.pdf --password "open-secret" --owner-password "admin-secret" --no-copy -o locked.pdf
+# Encrypt a PDF with user and owner passwords from environment variables
+sheaf protect contract.pdf --new-password-env PDF_PASS --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf
 
-# Unlock an encrypted PDF
-sheaf unlock locked.pdf --password "open-secret" -o unlocked.pdf --json
+# Unlock an encrypted PDF using standard input
+printf '%s' "$PDF_PASS" | sheaf unlock locked.pdf --password-stdin -o unlocked.pdf --json
 ```
 
 ---

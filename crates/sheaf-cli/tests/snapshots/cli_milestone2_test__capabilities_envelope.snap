@@ -1018,21 +1018,21 @@ expression: cap_val
             "value_name": "NEW_OWNER_PASSWORD_FILE"
           },
           {
-            "help": "Disallow printing the protected PDF",
+            "help": "Disallow printing the protected PDF (Hinweis an den Viewer)",
             "kind": "flag",
             "long": "no-print",
             "required": false,
             "secret": false
           },
           {
-            "help": "Disallow copying text and graphics from the protected PDF",
+            "help": "Disallow copying text and graphics from the protected PDF (Hinweis an den Viewer)",
             "kind": "flag",
             "long": "no-copy",
             "required": false,
             "secret": false
           },
           {
-            "help": "Disallow modifying contents, annotations, and forms in the protected PDF",
+            "help": "Disallow modifying contents, annotations, and forms in the protected PDF (Hinweis an den Viewer)",
             "kind": "flag",
             "long": "no-modify",
             "required": false,

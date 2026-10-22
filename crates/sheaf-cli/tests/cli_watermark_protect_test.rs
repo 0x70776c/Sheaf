@@ -208,3 +208,36 @@ fn cli_watermark_protect_and_unlock_end_to_end() {
     assert_eq!(env_num["data"]["position"], "bottom-right");
     assert_eq!(env_num["data"]["pages_numbered"], serde_json::json!([2, 3]));
 }
+
+#[test]
+fn test_protect_help_contains_permission_hint_and_protect_without_password_fails_exit_2() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_a_2p.pdf");
+
+    // 1. protect --help contains permission disclaimer
+    let help_out = sheaf_cmd()
+        .args(["protect", "--help"])
+        .output()
+        .expect("run sheaf protect --help");
+    assert_eq!(help_out.status.code(), Some(0));
+    let help_text = String::from_utf8_lossy(&help_out.stdout);
+    assert!(
+        help_text.contains("--no-print, --no-copy, --no-modify sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort."),
+        "Missing exact permission notice in protect --help:\n{help_text}"
+    );
+
+    // 2. Calling protect without any --new-password-* flags fails with exit 2
+    let out_no_pw = sheaf_cmd()
+        .args(["protect", src.to_str().unwrap(), "--json"])
+        .output()
+        .expect("run sheaf protect without password");
+    assert_eq!(out_no_pw.status.code(), Some(2));
+    let json_no_pw: Value = serde_json::from_slice(&out_no_pw.stdout).expect("parse json");
+    assert_eq!(json_no_pw["ok"], false);
+    assert_eq!(json_no_pw["error"]["exit_code"], 2);
+    assert!(
+        json_no_pw["error"]["message"].as_str().unwrap().contains("Missing required password. Specify --new-password-env VAR, --new-password-file PATH, or --new-password-stdin."),
+        "Unexpected error message: {}",
+        json_no_pw["error"]["message"]
+    );
+}
