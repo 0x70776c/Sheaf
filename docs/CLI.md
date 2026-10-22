@@ -21,6 +21,9 @@
 - [`sheaf number`](#sheaf-number)
 - [`sheaf protect`](#sheaf-protect)
 - [`sheaf unlock`](#sheaf-unlock)
+- [`sheaf meta get`](#sheaf-meta-get)
+- [`sheaf meta set`](#sheaf-meta-set)
+- [`sheaf meta strip`](#sheaf-meta-strip)
 - [`sheaf info`](#sheaf-info)
 - [`sheaf verify`](#sheaf-verify)
 - [`sheaf capabilities`](#sheaf-capabilities)
@@ -423,6 +426,82 @@ Remove password protection (decrypt) from an encrypted PDF file
 ```bash
 sheaf unlock protected.pdf --password-env PDF_PASS -o unlocked.pdf
 sheaf unlock encrypted.pdf --password-file /path/to/pw -o plain.pdf --json
+```
+
+## `sheaf meta get`
+
+Read standard and custom metadata and inspect XMP status
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | PDF files to inspect metadata from |
+| `--xmp` | - | No | Include full raw XMP packet string (up to 1MB) (values: `true`, `false`) |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+
+### Examples
+
+```bash
+sheaf meta get report.pdf
+sheaf meta get a.pdf b.pdf --xmp --json
+```
+
+## `sheaf meta set`
+
+Update document metadata fields, custom keys, and synchronize XMP
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file to modify metadata for |
+| `--title` | `<TITLE>` | No | Set document title |
+| `--author` | `<AUTHOR>` | No | Set document author |
+| `--subject` | `<SUBJECT>` | No | Set document subject |
+| `--keywords` | `<KEYWORDS>` | No | Set document keywords |
+| `--creator` | `<CREATOR>` | No | Set document creator tool |
+| `--producer` | `<PRODUCER>` | No | Set document PDF producer |
+| `--creation-date` | `<CREATION_DATE>` | No | Set creation date (ISO-8601 string) |
+| `--mod-date` | `<MOD_DATE>` | No | Set modification date ('now', 'keep', or ISO-8601 string) (default: `now`) |
+| `--custom` | `<KEY=VALUE>` | No | Set custom key-value pairs (repeatable, format KEY=VALUE) |
+| `--unset` | `<KEY>` | No | Remove a metadata key (repeatable, standard or custom) |
+| `--xmp` | `<XMP>` | No | XMP synchronization mode (sync, keep, drop) (default: `sync`) (values: `sync`, `keep`, `drop`) |
+| `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_meta.pdf) |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+
+### Examples
+
+```bash
+sheaf meta set report.pdf --title "Q3 Report" --author "Müller" -o updated.pdf
+sheaf meta set doc.pdf --custom Department=Finance --unset Producer -o clean_prod.pdf --json
+```
+
+## `sheaf meta strip`
+
+Strip metadata, PieceInfo, and object-level metadata from PDF
+
+### Options & Arguments
+
+| Option / Argument | Value | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `<input>` | `<INPUT>` | Yes | Input PDF file to strip metadata from |
+| `--deep` | - | No | Also strip metadata from annotations (/T, /M, /CreationDate, /Subj) (values: `true`, `false`) |
+| `--keep` | `<FIELD>` | No | Preserve specific metadata fields in the Info dictionary (repeatable) |
+| `-o, --out` | `<OUT>` | No | Target output PDF file (defaults to {stem}_clean.pdf) |
+| `--password-env` | `<PASSWORD_ENV>` | No | Read the open password from an environment variable |
+| `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
+| `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
+
+### Examples
+
+```bash
+sheaf meta strip input.pdf -o cleaned.pdf
+sheaf meta strip sensitive.pdf --deep --keep Title -o anonymized.pdf --json
 ```
 
 ## `sheaf info`

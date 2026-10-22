@@ -1,8 +1,14 @@
 //! Metadata manipulation engine, encoding/decoding codecs, and date utilities for Sheaf.
 
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
-use lopdf::{Object, StringFormat};
+use lopdf::{Dictionary, Document, Object, StringFormat};
 use serde::{Deserialize, Serialize};
+
+use crate::load::{LoadOptions, load_pdf};
+use crate::{Progress, SheafError};
 
 // ============================================================================
 // 1. PDFDocEncoding & UTF-16BE / UTF-8 Codec
@@ -185,7 +191,7 @@ pub fn object_to_decoded_string(obj: &Object) -> Option<String> {
 // ============================================================================
 
 /// Parsed or raw PDF date information.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PdfDateInfo {
     /// Formatted ISO 8601 string (e.g. `"2026-10-22T10:00:00+02:00"` or `"2026-10-22T10:00:00Z"`), or `None` if unparseable.
     pub iso: Option<String>,
@@ -355,8 +361,500 @@ pub fn format_iso_date(dt: &DateTime<FixedOffset>) -> String {
 }
 
 // ============================================================================
-// 3. Tests for 11B.1
+// 3. Metadata Extraction & Models
 // ============================================================================
+
+/// Standard metadata fields in PDF `/Info` dictionary.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetaInfoFields {
+    /// Document title.
+    pub title: Option<String>,
+    /// Document author.
+    pub author: Option<String>,
+    /// Document subject.
+    pub subject: Option<String>,
+    /// Keywords describing document content.
+    pub keywords: Option<String>,
+    /// Tool/application that originally created the document content.
+    pub creator: Option<String>,
+    /// PDF producer library or engine (e.g. Sheaf, PDFium).
+    pub producer: Option<String>,
+}
+
+/// Metadata dates (`CreationDate` and `ModDate`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetaDatesFields {
+    /// Document creation timestamp (ISO 8601 string and raw PDF value).
+    pub creation_date: PdfDateInfo,
+    /// Document modification timestamp (ISO 8601 string and raw PDF value).
+    pub mod_date: PdfDateInfo,
+}
+
+/// XMP metadata packet presence and sync status.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetaXmpInfo {
+    /// Whether an XMP metadata packet exists in the Catalog `/Metadata` stream.
+    pub present: bool,
+    /// Size of the raw XMP metadata stream in bytes (`None` if absent).
+    pub size_bytes: Option<usize>,
+    /// Whether standard properties in XMP match the Info dictionary (`None` if no XMP).
+    pub in_sync: Option<bool>,
+    /// Raw XMP XML packet string (only populated if requested via `--xmp`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub packet: Option<String>,
+}
+
+/// Complete metadata report for a single PDF file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetaFileResult {
+    /// Input file path.
+    pub path: String,
+    /// Standard metadata fields.
+    pub info: MetaInfoFields,
+    /// Document creation and modification dates.
+    pub dates: MetaDatesFields,
+    /// Custom key-value pairs stored in the Info dictionary outside standard fields.
+    pub custom: BTreeMap<String, String>,
+    /// XMP metadata status and packet details.
+    pub xmp: MetaXmpInfo,
+    /// Per-file error message (e.g. if encrypted without password or corrupted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// Operation success indicator for this file.
+    pub ok: bool,
+}
+
+/// Report returned by [`meta_get`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetaGetReport {
+    /// Metadata results for each input file.
+    pub files: Vec<MetaFileResult>,
+}
+
+/// Options for [`meta_get`].
+#[derive(Debug, Clone, Default)]
+pub struct MetaGetOptions {
+    /// Decryption options for password-protected files.
+    pub load: LoadOptions,
+    /// Whether to include the raw XMP packet content string (up to 1MB).
+    pub include_xmp_packet: bool,
+}
+
+/// Known standard Info dictionary keys.
+pub const STANDARD_INFO_KEYS: &[&[u8]] = &[
+    b"Title",
+    b"Author",
+    b"Subject",
+    b"Keywords",
+    b"Creator",
+    b"Producer",
+    b"CreationDate",
+    b"ModDate",
+    b"Trapped",
+];
+
+/// Extracts standard info fields from a lopdf Document.
+///
+/// Shared single source of truth for both `sheaf info` and `sheaf meta`.
+pub fn extract_info_fields(doc: &Document) -> Option<MetaInfoFields> {
+    let dict = get_info_dictionary(doc)?;
+    Some(MetaInfoFields {
+        title: dict_decoded_string(doc, dict, b"Title"),
+        author: dict_decoded_string(doc, dict, b"Author"),
+        subject: dict_decoded_string(doc, dict, b"Subject"),
+        keywords: dict_decoded_string(doc, dict, b"Keywords"),
+        creator: dict_decoded_string(doc, dict, b"Creator"),
+        producer: dict_decoded_string(doc, dict, b"Producer"),
+    })
+}
+
+/// Extracts dates from the Info dictionary.
+pub fn extract_dates_fields(doc: &Document) -> MetaDatesFields {
+    let dict = match get_info_dictionary(doc) {
+        Some(d) => d,
+        None => {
+            return MetaDatesFields {
+                creation_date: PdfDateInfo {
+                    iso: None,
+                    raw: None,
+                },
+                mod_date: PdfDateInfo {
+                    iso: None,
+                    raw: None,
+                },
+            };
+        }
+    };
+
+    MetaDatesFields {
+        creation_date: extract_date_field(doc, dict, b"CreationDate"),
+        mod_date: extract_date_field(doc, dict, b"ModDate"),
+    }
+}
+
+/// Extracts all custom (non-standard) key-value pairs from the Info dictionary.
+pub fn extract_custom_fields(doc: &Document) -> BTreeMap<String, String> {
+    let mut custom = BTreeMap::new();
+    let dict = match get_info_dictionary(doc) {
+        Some(d) => d,
+        None => return custom,
+    };
+
+    for (k, v) in dict.iter() {
+        let is_standard = STANDARD_INFO_KEYS.iter().any(|&std_key| std_key == k);
+        if !is_standard && let Ok(key_str) = std::str::from_utf8(k) {
+            let resolved = match v {
+                Object::Reference(id) => doc.get_object(*id).unwrap_or(v),
+                other => other,
+            };
+            if let Some(val_str) = object_to_decoded_string(resolved) {
+                custom.insert(key_str.to_string(), val_str);
+            }
+        }
+    }
+
+    custom
+}
+
+fn extract_date_field(doc: &Document, dict: &Dictionary, key: &[u8]) -> PdfDateInfo {
+    let raw = dict_decoded_string(doc, dict, key);
+    let iso = raw
+        .as_deref()
+        .and_then(|r| parse_pdf_date(r).ok())
+        .map(|dt| format_iso_date(&dt));
+    PdfDateInfo { iso, raw }
+}
+
+fn dict_decoded_string(doc: &Document, dict: &Dictionary, key: &[u8]) -> Option<String> {
+    let obj = dict.get(key).ok()?;
+    let resolved = match obj {
+        Object::Reference(id) => doc.get_object(*id).ok()?,
+        other => other,
+    };
+    object_to_decoded_string(resolved)
+}
+
+/// Resolves the trailer `/Info` dictionary if present.
+pub fn get_info_dictionary(doc: &Document) -> Option<&Dictionary> {
+    let info_obj = doc.trailer.get(b"Info").ok()?;
+    match info_obj {
+        Object::Dictionary(d) => Some(d),
+        Object::Reference(id) => doc.get_dictionary(*id).ok(),
+        _ => None,
+    }
+}
+
+/// Resolves a mutable reference to the trailer `/Info` dictionary, or creates one if absent.
+pub fn get_or_create_info_dictionary_mut(
+    doc: &mut Document,
+) -> Result<lopdf::ObjectId, SheafError> {
+    if let Ok(info_obj) = doc.trailer.get(b"Info") {
+        match info_obj {
+            Object::Reference(id) => return Ok(*id),
+            Object::Dictionary(d) => {
+                let clone_d = d.clone();
+                let id = doc.add_object(Object::Dictionary(clone_d));
+                doc.trailer.set("Info", Object::Reference(id));
+                return Ok(id);
+            }
+            _ => {}
+        }
+    }
+
+    let id = doc.add_object(Object::Dictionary(Dictionary::new()));
+    doc.trailer.set("Info", Object::Reference(id));
+    Ok(id)
+}
+
+// ============================================================================
+// 4. XMP Metadata Inspection & Synchronization
+// ============================================================================
+
+/// Parsed XMP standard properties.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ParsedXmpProperties {
+    title: Option<String>,
+    author: Option<String>,
+    subject: Option<String>,
+    keywords: Option<String>,
+    creator_tool: Option<String>,
+    producer: Option<String>,
+    create_date: Option<String>,
+    modify_date: Option<String>,
+}
+
+/// Inspects the Catalog `/Metadata` stream and parses standard XMP properties.
+pub fn inspect_xmp_metadata(
+    doc: &Document,
+    info: &MetaInfoFields,
+    dates: &MetaDatesFields,
+    include_packet: bool,
+) -> MetaXmpInfo {
+    let meta_stream_obj = match doc.catalog().and_then(|c| c.get(b"Metadata")) {
+        Ok(Object::Reference(id)) => doc.get_object(*id).ok(),
+        Ok(Object::Stream(s)) => Some(&Object::Stream(s.clone())),
+        _ => None,
+    };
+
+    let stream = match meta_stream_obj {
+        Some(Object::Stream(s)) => s,
+        _ => {
+            return MetaXmpInfo {
+                present: false,
+                size_bytes: None,
+                in_sync: None,
+                packet: None,
+            };
+        }
+    };
+
+    let decompressed = stream.decompressed_content().ok();
+    let bytes: &[u8] = decompressed.as_deref().unwrap_or(&stream.content);
+    let size_bytes = bytes.len();
+
+    let packet_str = if include_packet {
+        // Truncate to 1MB if larger
+        let limit = size_bytes.min(1024 * 1024);
+        Some(String::from_utf8_lossy(&bytes[..limit]).into_owned())
+    } else {
+        None
+    };
+
+    let parsed_xmp = parse_xmp_packet(bytes);
+    let in_sync = match parsed_xmp {
+        Some(xmp) => Some(check_xmp_in_sync(info, dates, &xmp)),
+        None => Some(false), // Malformed XMP packet
+    };
+
+    MetaXmpInfo {
+        present: true,
+        size_bytes: Some(size_bytes),
+        in_sync,
+        packet: packet_str,
+    }
+}
+
+/// Parses an XML byte slice looking for known XMP Dublin Core, PDF, and XMP Basic elements.
+fn parse_xmp_packet(bytes: &[u8]) -> Option<ParsedXmpProperties> {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+
+    let mut reader = Reader::from_reader(bytes);
+    reader.config_mut().trim_text(true);
+
+    let mut props = ParsedXmpProperties::default();
+    let mut current_tag = String::new();
+    let mut current_text = String::new();
+
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let ln = e.local_name();
+                let local_name = ln.as_ref();
+                if matches!(
+                    local_name,
+                    "title"
+                        | "creator"
+                        | "description"
+                        | "Keywords"
+                        | "CreatorTool"
+                        | "Producer"
+                        | "CreateDate"
+                        | "ModifyDate"
+                ) {
+                    current_tag = local_name.to_string();
+                    current_text.clear();
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if !current_tag.is_empty() {
+                    let text = e.as_ref();
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        if !current_text.is_empty() {
+                            current_text.push(' ');
+                        }
+                        current_text.push_str(trimmed);
+                    }
+                }
+            }
+            Ok(Event::End(e)) => {
+                let ln = e.local_name();
+                let local_name = ln.as_ref();
+                if local_name == current_tag {
+                    let val = current_text.trim().to_string();
+                    if !val.is_empty() {
+                        match current_tag.as_str() {
+                            "title" => props.title = Some(val),
+                            "creator" => props.author = Some(val),
+                            "description" => props.subject = Some(val),
+                            "Keywords" => props.keywords = Some(val),
+                            "CreatorTool" => props.creator_tool = Some(val),
+                            "Producer" => props.producer = Some(val),
+                            "CreateDate" => props.create_date = Some(val),
+                            "ModifyDate" => props.modify_date = Some(val),
+                            _ => {}
+                        }
+                    }
+                    current_tag.clear();
+                    current_text.clear();
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => return None,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    Some(props)
+}
+
+fn check_xmp_in_sync(
+    info: &MetaInfoFields,
+    dates: &MetaDatesFields,
+    xmp: &ParsedXmpProperties,
+) -> bool {
+    let check_opt = |a: &Option<String>, b: &Option<String>| -> bool {
+        match (a, b) {
+            (Some(s1), Some(s2)) => s1 == s2,
+            (None, None) => true,
+            _ => false,
+        }
+    };
+
+    if !check_opt(&info.title, &xmp.title) {
+        return false;
+    }
+    if !check_opt(&info.author, &xmp.author) {
+        return false;
+    }
+    if !check_opt(&info.subject, &xmp.subject) {
+        return false;
+    }
+    if !check_opt(&info.keywords, &xmp.keywords) {
+        return false;
+    }
+    if !check_opt(&info.creator, &xmp.creator_tool) {
+        return false;
+    }
+    if !check_opt(&info.producer, &xmp.producer) {
+        return false;
+    }
+
+    // Dates comparison
+    let check_date = |info_dt: &PdfDateInfo, xmp_raw: &Option<String>| -> bool {
+        match (&info_dt.iso, xmp_raw) {
+            (Some(iso1), Some(raw2)) => {
+                let parsed2 = parse_pdf_date(raw2).ok().map(|dt| format_iso_date(&dt));
+                match parsed2 {
+                    Some(iso2) => iso1 == &iso2,
+                    None => false,
+                }
+            }
+            (None, None) => true,
+            _ => false,
+        }
+    };
+
+    if !check_date(&dates.creation_date, &xmp.create_date) {
+        return false;
+    }
+    if !check_date(&dates.mod_date, &xmp.modify_date) {
+        return false;
+    }
+
+    true
+}
+
+// ============================================================================
+// 5. `meta_get` Operation
+// ============================================================================
+
+/// Reads metadata from one or more PDF files.
+///
+/// Encrypted files without a password will produce an error entry with code `encrypted`
+/// (or return [`SheafError::Encrypted`] if single file / overall failure).
+pub fn meta_get(
+    files: &[PathBuf],
+    opts: &MetaGetOptions,
+    p: &dyn Progress,
+) -> Result<MetaGetReport, SheafError> {
+    if files.is_empty() {
+        return Err(SheafError::EmptySelection);
+    }
+
+    let total = files.len() as u64;
+    p.report(0, total);
+
+    let mut results = Vec::with_capacity(files.len());
+    let mut first_error: Option<SheafError> = None;
+
+    for (idx, path) in files.iter().enumerate() {
+        if p.is_cancelled() {
+            return Err(SheafError::Cancelled);
+        }
+
+        let res = match load_pdf(path, &opts.load) {
+            Ok(loaded) => {
+                let doc = &loaded.doc;
+                let info = extract_info_fields(doc).unwrap_or_default();
+                let dates = extract_dates_fields(doc);
+                let custom = extract_custom_fields(doc);
+                let xmp = inspect_xmp_metadata(doc, &info, &dates, opts.include_xmp_packet);
+
+                MetaFileResult {
+                    path: path.to_string_lossy().into_owned(),
+                    info,
+                    dates,
+                    custom,
+                    xmp,
+                    error: None,
+                    ok: true,
+                }
+            }
+            Err(e) => {
+                if first_error.is_none() {
+                    first_error = Some(match &e {
+                        SheafError::Encrypted => SheafError::Encrypted,
+                        SheafError::WrongPassword => SheafError::WrongPassword,
+                        SheafError::InvalidPdf(msg) => SheafError::InvalidPdf(msg.clone()),
+                        SheafError::EmptySelection => SheafError::EmptySelection,
+                        SheafError::PageOutOfRange { page, total } => SheafError::PageOutOfRange {
+                            page: *page,
+                            total: *total,
+                        },
+                        SheafError::Cancelled => SheafError::Cancelled,
+                        _ => SheafError::InvalidPdf(e.to_string()),
+                    });
+                }
+                MetaFileResult {
+                    path: path.to_string_lossy().into_owned(),
+                    info: MetaInfoFields::default(),
+                    dates: MetaDatesFields::default(),
+                    custom: BTreeMap::new(),
+                    xmp: MetaXmpInfo::default(),
+                    error: Some(e.to_string()),
+                    ok: false,
+                }
+            }
+        };
+
+        results.push(res);
+        p.report(idx as u64 + 1, total);
+    }
+
+    // If all files failed and we only had one file, return the specific SheafError
+    if files.len() == 1
+        && !results[0].ok
+        && let Some(err) = first_error
+    {
+        return Err(err);
+    }
+
+    Ok(MetaGetReport { files: results })
+}
 
 #[cfg(test)]
 mod tests {

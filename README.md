@@ -242,7 +242,26 @@ printf '%s' "$PDF_PASS" | sheaf unlock locked.pdf --password-stdin -o unlocked.p
 
 ---
 
-### 10. `sheaf info`
+### 10. `sheaf meta`
+Read (`get`), update (`set`), or sanitize (`strip`) document metadata, custom keys, and synchronize embedded XMP packets.
+
+```bash
+# Read document metadata and inspect XMP status
+sheaf meta get report.pdf
+sheaf meta get a.pdf b.pdf --xmp --json
+
+# Update metadata fields and synchronize XMP
+sheaf meta set report.pdf --title "Q3 Report" --author "Müller" -o updated.pdf
+sheaf meta set doc.pdf --custom Department=Finance --unset Producer -o clean_prod.pdf --json
+
+# Strip metadata, PieceInfo, and object-level metadata from PDF
+sheaf meta strip input.pdf -o cleaned.pdf
+sheaf meta strip sensitive.pdf --deep --keep Title -o anonymized.pdf --json
+```
+
+---
+
+### 11. `sheaf info`
 Inspect structural properties and metadata (`size_bytes`, `pdf_version`, `pages`, `encrypted`, `metadata`, `has_outlines`, `outline_count`, `first_page_size_pt`). Encrypted PDFs return exit code `0` with `"encrypted": true` and `"pages": null`.
 
 ```bash

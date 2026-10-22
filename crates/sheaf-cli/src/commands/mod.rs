@@ -9,6 +9,7 @@ pub mod convert;
 pub mod docs;
 pub mod info;
 pub mod merge;
+pub mod meta;
 pub mod number;
 pub mod pages;
 pub mod protect;

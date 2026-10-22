@@ -125,6 +125,9 @@ pub enum Commands {
     )]
     Unlock(UnlockArgs),
 
+    /// Inspect, modify, or strip document metadata and XMP packets
+    Meta(MetaArgs),
+
     /// Inspect structural properties and metadata of PDF files
     #[command(after_help = "Examples:\n  sheaf info document.pdf\n  sheaf info a.pdf b.pdf --json")]
     Info(InfoArgs),
@@ -647,6 +650,125 @@ pub struct UnlockArgs {
     /// Target output PDF file (defaults to {stem}_unlocked.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaArgs {
+    #[command(subcommand)]
+    pub action: MetaCommands,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum MetaCommands {
+    /// Read standard and custom metadata and inspect XMP status
+    #[command(
+        after_help = "Examples:\n  sheaf meta get report.pdf\n  sheaf meta get a.pdf b.pdf --xmp --json"
+    )]
+    Get(MetaGetArgs),
+
+    /// Update document metadata fields, custom keys, and synchronize XMP
+    #[command(
+        after_help = "Examples:\n  sheaf meta set report.pdf --title \"Q3 Report\" --author \"Müller\" -o updated.pdf\n  sheaf meta set doc.pdf --custom Department=Finance --unset Producer -o clean_prod.pdf --json"
+    )]
+    Set(Box<MetaSetArgs>),
+
+    /// Strip metadata, PieceInfo, and object-level metadata from PDF
+    #[command(
+        after_help = "Examples:\n  sheaf meta strip input.pdf -o cleaned.pdf\n  sheaf meta strip sensitive.pdf --deep --keep Title -o anonymized.pdf --json"
+    )]
+    Strip(MetaStripArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaGetArgs {
+    /// PDF files to inspect metadata from
+    #[arg(required = true)]
+    pub input: Vec<PathBuf>,
+
+    /// Include full raw XMP packet string (up to 1MB)
+    #[arg(long)]
+    pub xmp: bool,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaSetArgs {
+    /// Input PDF file to modify metadata for
+    pub input: PathBuf,
+
+    /// Set document title
+    #[arg(long)]
+    pub title: Option<String>,
+
+    /// Set document author
+    #[arg(long)]
+    pub author: Option<String>,
+
+    /// Set document subject
+    #[arg(long)]
+    pub subject: Option<String>,
+
+    /// Set document keywords
+    #[arg(long)]
+    pub keywords: Option<String>,
+
+    /// Set document creator tool
+    #[arg(long)]
+    pub creator: Option<String>,
+
+    /// Set document PDF producer
+    #[arg(long)]
+    pub producer: Option<String>,
+
+    /// Set creation date (ISO-8601 string)
+    #[arg(long)]
+    pub creation_date: Option<String>,
+
+    /// Set modification date ('now', 'keep', or ISO-8601 string)
+    #[arg(long, default_value = "now")]
+    pub mod_date: String,
+
+    /// Set custom key-value pairs (repeatable, format KEY=VALUE)
+    #[arg(long = "custom", value_name = "KEY=VALUE")]
+    pub custom: Vec<String>,
+
+    /// Remove a metadata key (repeatable, standard or custom)
+    #[arg(long = "unset", value_name = "KEY")]
+    pub unset: Vec<String>,
+
+    /// XMP synchronization mode (sync, keep, drop)
+    #[arg(long, default_value = "sync", value_parser = ["sync", "keep", "drop"])]
+    pub xmp: String,
+
+    /// Target output PDF file (defaults to {stem}_meta.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaStripArgs {
+    /// Input PDF file to strip metadata from
+    pub input: PathBuf,
+
+    /// Also strip metadata from annotations (/T, /M, /CreationDate, /Subj)
+    #[arg(long)]
+    pub deep: bool,
+
+    /// Preserve specific metadata fields in the Info dictionary (repeatable)
+    #[arg(long = "keep", value_name = "FIELD")]
+    pub keep: Vec<String>,
+
+    /// Target output PDF file (defaults to {stem}_clean.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 }
 
 #[derive(Debug, Clone, Args)]

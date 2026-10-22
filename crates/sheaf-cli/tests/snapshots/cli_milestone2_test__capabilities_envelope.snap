@@ -1100,6 +1100,253 @@ expression: cap_val
       {
         "args": [
           {
+            "help": "PDF files to inspect metadata from",
+            "kind": "positional",
+            "name": "input",
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "help": "Include full raw XMP packet string (up to 1MB)",
+            "kind": "flag",
+            "long": "xmp",
+            "required": false,
+            "secret": false
+          },
+          {
+            "help": "Read the open password from an environment variable",
+            "kind": "option",
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "help": "Read the open password from a file",
+            "kind": "option",
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "help": "Read the open password from standard input",
+            "kind": "flag",
+            "long": "password-stdin",
+            "required": false,
+            "secret": true
+          }
+        ],
+        "help": "Read standard and custom metadata and inspect XMP status",
+        "name": "meta get",
+        "status": "stable"
+      },
+      {
+        "args": [
+          {
+            "help": "Input PDF file to modify metadata for",
+            "kind": "positional",
+            "name": "input",
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "help": "Set document title",
+            "kind": "option",
+            "long": "title",
+            "required": false,
+            "secret": false,
+            "value_name": "TITLE"
+          },
+          {
+            "help": "Set document author",
+            "kind": "option",
+            "long": "author",
+            "required": false,
+            "secret": false,
+            "value_name": "AUTHOR"
+          },
+          {
+            "help": "Set document subject",
+            "kind": "option",
+            "long": "subject",
+            "required": false,
+            "secret": false,
+            "value_name": "SUBJECT"
+          },
+          {
+            "help": "Set document keywords",
+            "kind": "option",
+            "long": "keywords",
+            "required": false,
+            "secret": false,
+            "value_name": "KEYWORDS"
+          },
+          {
+            "help": "Set document creator tool",
+            "kind": "option",
+            "long": "creator",
+            "required": false,
+            "secret": false,
+            "value_name": "CREATOR"
+          },
+          {
+            "help": "Set document PDF producer",
+            "kind": "option",
+            "long": "producer",
+            "required": false,
+            "secret": false,
+            "value_name": "PRODUCER"
+          },
+          {
+            "help": "Set creation date (ISO-8601 string)",
+            "kind": "option",
+            "long": "creation-date",
+            "required": false,
+            "secret": false,
+            "value_name": "CREATION_DATE"
+          },
+          {
+            "default": "now",
+            "help": "Set modification date ('now', 'keep', or ISO-8601 string)",
+            "kind": "option",
+            "long": "mod-date",
+            "required": false,
+            "secret": false,
+            "value_name": "MOD_DATE"
+          },
+          {
+            "help": "Set custom key-value pairs (repeatable, format KEY=VALUE)",
+            "kind": "option",
+            "long": "custom",
+            "required": false,
+            "secret": false,
+            "value_name": "KEY=VALUE"
+          },
+          {
+            "help": "Remove a metadata key (repeatable, standard or custom)",
+            "kind": "option",
+            "long": "unset",
+            "required": false,
+            "secret": false,
+            "value_name": "KEY"
+          },
+          {
+            "default": "sync",
+            "help": "XMP synchronization mode (sync, keep, drop)",
+            "kind": "option",
+            "long": "xmp",
+            "possible_values": [
+              "sync",
+              "keep",
+              "drop"
+            ],
+            "required": false,
+            "secret": false,
+            "value_name": "XMP"
+          },
+          {
+            "help": "Target output PDF file (defaults to {stem}_meta.pdf)",
+            "kind": "option",
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          },
+          {
+            "help": "Read the open password from an environment variable",
+            "kind": "option",
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "help": "Read the open password from a file",
+            "kind": "option",
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "help": "Read the open password from standard input",
+            "kind": "flag",
+            "long": "password-stdin",
+            "required": false,
+            "secret": true
+          }
+        ],
+        "help": "Update document metadata fields, custom keys, and synchronize XMP",
+        "name": "meta set",
+        "status": "stable"
+      },
+      {
+        "args": [
+          {
+            "help": "Input PDF file to strip metadata from",
+            "kind": "positional",
+            "name": "input",
+            "required": true,
+            "secret": false,
+            "value_name": "INPUT"
+          },
+          {
+            "help": "Also strip metadata from annotations (/T, /M, /CreationDate, /Subj)",
+            "kind": "flag",
+            "long": "deep",
+            "required": false,
+            "secret": false
+          },
+          {
+            "help": "Preserve specific metadata fields in the Info dictionary (repeatable)",
+            "kind": "option",
+            "long": "keep",
+            "required": false,
+            "secret": false,
+            "value_name": "FIELD"
+          },
+          {
+            "help": "Target output PDF file (defaults to {stem}_clean.pdf)",
+            "kind": "option",
+            "long": "out",
+            "required": false,
+            "secret": false,
+            "value_name": "OUT"
+          },
+          {
+            "help": "Read the open password from an environment variable",
+            "kind": "option",
+            "long": "password-env",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_ENV"
+          },
+          {
+            "help": "Read the open password from a file",
+            "kind": "option",
+            "long": "password-file",
+            "required": false,
+            "secret": true,
+            "value_name": "PASSWORD_FILE"
+          },
+          {
+            "help": "Read the open password from standard input",
+            "kind": "flag",
+            "long": "password-stdin",
+            "required": false,
+            "secret": true
+          }
+        ],
+        "help": "Strip metadata, PieceInfo, and object-level metadata from PDF",
+        "name": "meta strip",
+        "status": "stable"
+      },
+      {
+        "args": [
+          {
             "help": "PDF files to inspect",
             "kind": "positional",
             "name": "files",

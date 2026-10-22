@@ -97,6 +97,7 @@ fn main() -> ExitCode {
         Commands::Number(args) => execute_command(args, &cli.global, cancelled),
         Commands::Protect(args) => execute_command(args, &cli.global, cancelled),
         Commands::Unlock(args) => execute_command(args, &cli.global, cancelled),
+        Commands::Meta(args) => execute_command(args, &cli.global, cancelled),
         Commands::Info(args) => execute_command(args, &cli.global, cancelled),
         Commands::Verify(args) => execute_command(args, &cli.global, cancelled),
         Commands::Capabilities(args) => execute_command(args, &cli.global, cancelled),

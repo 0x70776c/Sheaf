@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lopdf::{Dictionary, Document, Object};
+use lopdf::{Document, Object};
 use serde::Serialize;
 
 use crate::load::{LoadOptions, load_pdf};
@@ -229,30 +229,15 @@ fn read_header_version(path: &Path) -> Option<String> {
 }
 
 fn extract_metadata(doc: &Document) -> Option<PdfMetadataInfo> {
-    let info_obj = doc.trailer.get(b"Info").ok()?;
-    let dict = match info_obj {
-        Object::Dictionary(d) => d,
-        Object::Reference(id) => doc.get_dictionary(*id).ok()?,
-        _ => return None,
-    };
-
+    let fields = crate::ops::meta::extract_info_fields(doc)?;
     Some(PdfMetadataInfo {
-        title: dict_string_field(doc, dict, b"Title"),
-        author: dict_string_field(doc, dict, b"Author"),
-        subject: dict_string_field(doc, dict, b"Subject"),
-        keywords: dict_string_field(doc, dict, b"Keywords"),
-        creator: dict_string_field(doc, dict, b"Creator"),
-        producer: dict_string_field(doc, dict, b"Producer"),
+        title: fields.title,
+        author: fields.author,
+        subject: fields.subject,
+        keywords: fields.keywords,
+        creator: fields.creator,
+        producer: fields.producer,
     })
-}
-
-fn dict_string_field(doc: &Document, dict: &Dictionary, key: &[u8]) -> Option<String> {
-    let obj = dict.get(key).ok()?;
-    let resolved = match obj {
-        Object::Reference(id) => doc.get_object(*id).ok()?,
-        other => other,
-    };
-    lopdf::decode_text_string(resolved).ok()
 }
 
 fn extract_page_size_pt(doc: &Document, page_id: lopdf::ObjectId) -> Option<[f64; 2]> {
