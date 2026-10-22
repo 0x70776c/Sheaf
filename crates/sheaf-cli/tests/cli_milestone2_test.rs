@@ -548,6 +548,45 @@ fn cli_json_envelope_snapshots() {
         ".data.files[].size_bytes" => "[size_bytes]",
     });
 
+    // 2b. info on encrypted PDF (without password and with password)
+    let prot_out = sheaf_cmd()
+        .current_dir(temp.path())
+        .args([
+            "protect",
+            "report.pdf",
+            "--new-password-stdin",
+            "-o",
+            "locked.pdf",
+        ])
+        .write_stdin("snap-pass-123\n")
+        .output()
+        .expect("protect report.pdf");
+    assert_eq!(prot_out.status.code(), Some(0));
+
+    let info_enc_no_pw = sheaf_cmd()
+        .current_dir(temp.path())
+        .args(["info", "locked.pdf", "--json"])
+        .output()
+        .expect("info locked no pw");
+    let info_enc_no_pw_val: Value = serde_json::from_slice(&info_enc_no_pw.stdout).expect("json");
+    insta::assert_json_snapshot!("info_encrypted_without_password", info_enc_no_pw_val, {
+        ".duration_ms" => "[duration_ms]",
+        ".data.files[].size_bytes" => "[size_bytes]",
+    });
+
+    let info_enc_with_pw = sheaf_cmd()
+        .current_dir(temp.path())
+        .args(["info", "locked.pdf", "--password-stdin", "--json"])
+        .write_stdin("snap-pass-123\n")
+        .output()
+        .expect("info locked with pw");
+    let info_enc_with_pw_val: Value =
+        serde_json::from_slice(&info_enc_with_pw.stdout).expect("json");
+    insta::assert_json_snapshot!("info_encrypted_with_password", info_enc_with_pw_val, {
+        ".duration_ms" => "[duration_ms]",
+        ".data.files[].size_bytes" => "[size_bytes]",
+    });
+
     // 3. split --json
     let split_out = sheaf_cmd()
         .current_dir(temp.path())

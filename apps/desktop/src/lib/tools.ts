@@ -76,12 +76,12 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: 'info',
-    label: 'Info',
+    label: 'Info & Metadaten',
     group: 'secondary',
     shortcut: '⌘8',
-    actionLabel: 'Verify Structure',
-    emptyPrompt: 'Drop a PDF file here to inspect metadata and structure',
-    description: 'Inspect PDF version, page dimensions, outlines, and structural validity.',
+    actionLabel: 'Metadaten speichern',
+    emptyPrompt: 'Drop a PDF file here to inspect and edit metadata or sanitize',
+    description: 'Inspect PDF structure, edit metadata fields and custom keys, or strip identifying metadata.',
   },
 ];
 

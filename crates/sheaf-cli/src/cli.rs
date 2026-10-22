@@ -114,7 +114,8 @@ pub enum Commands {
 
     /// Password-protect (encrypt) a PDF file
     #[command(
-        after_help = "Examples:\n  sheaf protect report.pdf --new-password-env PDF_PASS -o protected.pdf\n  sheaf protect contract.pdf --new-password-file /path/to/pw --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf --json"
+        long_about = "Password-protect (encrypt) a PDF file.\n\nHinweis: --no-print, --no-copy, --no-modify sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort.",
+        after_help = "Examples:\n  sheaf protect report.pdf --new-password-env PDF_PASS -o protected.pdf\n  sheaf protect contract.pdf --new-password-file /path/to/pw --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf --json\n\nHinweis:\n  --no-print, --no-copy, --no-modify sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort."
     )]
     Protect(ProtectArgs),
 
@@ -123,6 +124,9 @@ pub enum Commands {
         after_help = "Examples:\n  sheaf unlock protected.pdf --password-env PDF_PASS -o unlocked.pdf\n  sheaf unlock encrypted.pdf --password-file /path/to/pw -o plain.pdf --json"
     )]
     Unlock(UnlockArgs),
+
+    /// Inspect, modify, or strip document metadata and XMP packets
+    Meta(MetaArgs),
 
     /// Inspect structural properties and metadata of PDF files
     #[command(after_help = "Examples:\n  sheaf info document.pdf\n  sheaf info a.pdf b.pdf --json")]
@@ -197,6 +201,37 @@ pub struct PagesArgs {
     pub action: PagesSubcommand,
 }
 
+/// Value parser for `--degrees`.
+///
+/// Parses any integer so that semantic validation stays in `sheaf-core`
+/// (stable error code `invalid_selection`), but advertises the supported
+/// values for `--help`, shell completion and `sheaf capabilities`.
+#[derive(Debug, Clone, Copy)]
+pub struct RotationDegreesParser;
+
+impl clap::builder::TypedValueParser for RotationDegreesParser {
+    type Value = i32;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        clap::value_parser!(i32).parse_ref(cmd, arg, value)
+    }
+
+    fn possible_values(
+        &self,
+    ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+        Some(Box::new(
+            ["90", "180", "270", "-90"]
+                .into_iter()
+                .map(clap::builder::PossibleValue::new),
+        ))
+    }
+}
+
 #[derive(Debug, Clone, Subcommand)]
 pub enum PagesSubcommand {
     /// Rotate selected pages (or all pages) additively by 90, 180, or 270 degrees
@@ -237,7 +272,11 @@ pub struct PagesRotateArgs {
     pub pages: Option<String>,
 
     /// Clockwise rotation angle in degrees (90, 180, 270, or -90)
-    #[arg(long, allow_hyphen_values = true)]
+    #[arg(
+        long,
+        allow_hyphen_values = true,
+        value_parser = RotationDegreesParser
+    )]
     pub degrees: i32,
 
     /// Target output PDF file (defaults to {stem}_rotated.pdf)
@@ -516,7 +555,7 @@ pub struct NumberArgs {
     pub password_opts: OpenPasswordArgs,
 
     /// Page number format template supporting {n}, {total}, {page}, and {pages}
-    #[arg(long, default_value = "{n} / {total}")]
+    #[arg(long, default_value = "{n}")]
     pub format: String,
 
     /// Page number placement: bottom-center, bottom-right, bottom-left, top-center, top-right, or top-left
@@ -527,8 +566,8 @@ pub struct NumberArgs {
     #[arg(long, default_value_t = 1)]
     pub start: u32,
 
-    /// Font size in PDF points (6..=300)
-    #[arg(long, default_value_t = 11.0)]
+    /// Font size in PDF points (4..=72)
+    #[arg(long, default_value_t = 10.0)]
     pub font_size: f32,
 
     /// Opacity between 0.05 and 1.0
@@ -536,7 +575,7 @@ pub struct NumberArgs {
     pub opacity: f32,
 
     /// Color as #RRGGBB hex or preset name (gray, red, blue, black, green)
-    #[arg(long, default_value = "#111827")]
+    #[arg(long, default_value = "#444444")]
     pub color: String,
 
     /// Margin inset from page edges in PDF points (0..=200)
@@ -575,15 +614,15 @@ pub struct ProtectArgs {
     #[command(flatten)]
     pub new_password: NewPasswordArgs,
 
-    /// Disallow printing the protected PDF
+    /// Disallow printing the protected PDF (Hinweis an den Viewer)
     #[arg(long)]
     pub no_print: bool,
 
-    /// Disallow copying text and graphics from the protected PDF
+    /// Disallow copying text and graphics from the protected PDF (Hinweis an den Viewer)
     #[arg(long)]
     pub no_copy: bool,
 
-    /// Disallow modifying contents, annotations, and forms in the protected PDF
+    /// Disallow modifying contents, annotations, and forms in the protected PDF (Hinweis an den Viewer)
     #[arg(long)]
     pub no_modify: bool,
 
@@ -611,6 +650,125 @@ pub struct UnlockArgs {
     /// Target output PDF file (defaults to {stem}_unlocked.pdf)
     #[arg(short, long)]
     pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaArgs {
+    #[command(subcommand)]
+    pub action: MetaCommands,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum MetaCommands {
+    /// Read standard and custom metadata and inspect XMP status
+    #[command(
+        after_help = "Examples:\n  sheaf meta get report.pdf\n  sheaf meta get a.pdf b.pdf --xmp --json"
+    )]
+    Get(MetaGetArgs),
+
+    /// Update document metadata fields, custom keys, and synchronize XMP
+    #[command(
+        after_help = "Examples:\n  sheaf meta set report.pdf --title \"Q3 Report\" --author \"Müller\" -o updated.pdf\n  sheaf meta set doc.pdf --custom Department=Finance --unset Producer -o clean_prod.pdf --json"
+    )]
+    Set(Box<MetaSetArgs>),
+
+    /// Strip metadata, PieceInfo, and object-level metadata from PDF
+    #[command(
+        after_help = "Examples:\n  sheaf meta strip input.pdf -o cleaned.pdf\n  sheaf meta strip sensitive.pdf --deep --keep Title -o anonymized.pdf --json\n\nHinweis:\n  Strip entfernt keine sichtbaren Inhalte, eingebetteten Schriftnamen, Bild-EXIF oder Dateinamen eingebetteter Anhänge."
+    )]
+    Strip(MetaStripArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaGetArgs {
+    /// PDF files to inspect metadata from
+    #[arg(required = true)]
+    pub input: Vec<PathBuf>,
+
+    /// Include full raw XMP packet string (up to 1MB)
+    #[arg(long)]
+    pub xmp: bool,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaSetArgs {
+    /// Input PDF file to modify metadata for
+    pub input: PathBuf,
+
+    /// Set document title
+    #[arg(long)]
+    pub title: Option<String>,
+
+    /// Set document author
+    #[arg(long)]
+    pub author: Option<String>,
+
+    /// Set document subject
+    #[arg(long)]
+    pub subject: Option<String>,
+
+    /// Set document keywords
+    #[arg(long)]
+    pub keywords: Option<String>,
+
+    /// Set document creator tool
+    #[arg(long)]
+    pub creator: Option<String>,
+
+    /// Set document PDF producer
+    #[arg(long)]
+    pub producer: Option<String>,
+
+    /// Set creation date (ISO-8601 string)
+    #[arg(long)]
+    pub creation_date: Option<String>,
+
+    /// Set modification date ('now', 'keep', or ISO-8601 string)
+    #[arg(long, default_value = "now")]
+    pub mod_date: String,
+
+    /// Set custom key-value pairs (repeatable, format KEY=VALUE)
+    #[arg(long = "custom", value_name = "KEY=VALUE")]
+    pub custom: Vec<String>,
+
+    /// Remove a metadata key (repeatable, standard or custom)
+    #[arg(long = "unset", value_name = "KEY")]
+    pub unset: Vec<String>,
+
+    /// XMP synchronization mode (sync, keep, drop)
+    #[arg(long, default_value = "sync", value_parser = ["sync", "keep", "drop"])]
+    pub xmp: String,
+
+    /// Target output PDF file (defaults to {stem}_meta.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct MetaStripArgs {
+    /// Input PDF file to strip metadata from
+    pub input: PathBuf,
+
+    /// Also strip metadata from annotations (/T, /M, /CreationDate, /Subj)
+    #[arg(long)]
+    pub deep: bool,
+
+    /// Preserve specific metadata fields in the Info dictionary (repeatable)
+    #[arg(long = "keep", value_name = "FIELD")]
+    pub keep: Vec<String>,
+
+    /// Target output PDF file (defaults to {stem}_clean.pdf)
+    #[arg(short, long)]
+    pub out: Option<PathBuf>,
+
+    #[command(flatten)]
+    pub password_opts: OpenPasswordArgs,
 }
 
 #[derive(Debug, Clone, Args)]

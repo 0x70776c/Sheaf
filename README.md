@@ -215,32 +215,53 @@ sheaf watermark draft.pdf --text "DRAFT" --position bottom-right --color red --o
 ---
 
 ### 8. `sheaf number`
-Stamp vector page numbers onto PDF pages with format placeholders (`{n}`, `{total}`, `{page}`, `{pages}`), placement presets, start number, and page selection:
+Stamp vector page numbers onto PDF pages with format placeholders (`{n}`, `{total}`, `{page}`, `{pages}`), placement presets, start number, font size, color, opacity (`--opacity`, 0.05..=1.0), and page selection:
 
 ```bash
-# Bottom-center page numbering across all pages
+# Bottom-center page numbering across all pages (default format: {n})
 sheaf number report.pdf -o report_numbered.pdf
 
-# Bottom-right numbering starting at page 2, skipping cover page
-sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right --start 1 --pages "2-" -o thesis_numbered.pdf --json
+# Bottom-right numbering starting at page 2 with opacity, skipping cover page
+sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right --start 1 --pages "2-" --opacity 0.8 -o thesis_numbered.pdf --json
 ```
 
 ---
 
 ### 9. `sheaf protect` & `sheaf unlock`
-Encrypt (`protect`) a PDF with user/owner passwords and print/copy permissions, or decrypt (`unlock`) an encrypted PDF (returns exit code `4` with `"code": "wrong_password"` if the password is incorrect).
+Encrypt (`protect`) a PDF with user/owner passwords and print/copy/modify permissions, or decrypt (`unlock`) an encrypted PDF (returns exit code `4` with `"code": "wrong_password"` if the password is incorrect). Passwords are never passed via command-line arguments, but via environment variables, files, or stdin.
+
+> **Hinweis:** `--no-print`, `--no-copy`, `--no-modify` sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort.
 
 ```bash
-# Encrypt a PDF with user and owner passwords
-sheaf protect contract.pdf --password "open-secret" --owner-password "admin-secret" --no-copy -o locked.pdf
+# Encrypt a PDF with user and owner passwords from environment variables
+sheaf protect contract.pdf --new-password-env PDF_PASS --new-owner-password-env OWNER_PASS --no-copy -o locked.pdf
 
-# Unlock an encrypted PDF
-sheaf unlock locked.pdf --password "open-secret" -o unlocked.pdf --json
+# Unlock an encrypted PDF using standard input
+printf '%s' "$PDF_PASS" | sheaf unlock locked.pdf --password-stdin -o unlocked.pdf --json
 ```
 
 ---
 
-### 10. `sheaf info`
+### 10. `sheaf meta`
+Read (`get`), update (`set`), or sanitize (`strip`) document metadata, custom keys, and synchronize embedded XMP packets.
+
+```bash
+# Read document metadata and inspect XMP status
+sheaf meta get report.pdf
+sheaf meta get a.pdf b.pdf --xmp --json
+
+# Update metadata fields and synchronize XMP
+sheaf meta set report.pdf --title "Q3 Report" --author "Müller" -o updated.pdf
+sheaf meta set doc.pdf --custom Department=Finance --unset Producer -o clean_prod.pdf --json
+
+# Strip metadata, PieceInfo, and object-level metadata from PDF
+sheaf meta strip input.pdf -o cleaned.pdf
+sheaf meta strip sensitive.pdf --deep --keep Title -o anonymized.pdf --json
+```
+
+---
+
+### 11. `sheaf info`
 Inspect structural properties and metadata (`size_bytes`, `pdf_version`, `pages`, `encrypted`, `metadata`, `has_outlines`, `outline_count`, `first_page_size_pt`). Encrypted PDFs return exit code `0` with `"encrypted": true` and `"pages": null`.
 
 ```bash

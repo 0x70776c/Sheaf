@@ -4186,11 +4186,13 @@ dependencies = [
 name = "sheaf-core"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "image",
  "insta",
  "lopdf",
  "pdfium-render",
  "proptest",
+ "quick-xml",
  "secrecy",
  "serde",
  "serde_json",

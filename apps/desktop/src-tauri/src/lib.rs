@@ -15,14 +15,15 @@ use serde::Serialize;
 use sheaf_core::{
     CapabilitiesReport, CompressOptions, CompressPreset, CompressReport, ConvertPageSize,
     ConvertReport, DEFAULT_THUMBNAIL_WIDTH_PX, ImageFormat, ImagesToPdfOptions, InfoReport,
-    LoadOptions, MarkdownToPdfOptions, MergeOptions, MergeReport, NoProgress, NumberOptions,
+    LoadOptions, MarkdownToPdfOptions, MergeOptions, MergeReport, MetaGetOptions, MetaGetReport,
+    MetaSetOptions, MetaSetReport, MetaStripOptions, MetaStripReport, NoProgress, NumberOptions,
     NumberPosition, NumberReport, OverlayPosition, PageOpOptions, PageSelection, PagesReport,
     PdfToImagesOptions, PdfToMarkdownOptions, Progress, ProtectOptions, ProtectReport, SheafError,
     SplitMode, SplitOptions, SplitReport, UnlockOptions, WatermarkOptions, WatermarkPosition,
-    WatermarkReport, capabilities, compress_with_options, delete_pages, extract_pages,
-    format_page_number, images_to_pdf, info, markdown_to_pdf, merge_with_options, number,
-    pdf_to_images, pdf_to_markdown, preview_overlay_page, protect, render_thumbnails_with_options,
-    reorder_pages, rotate_pages, split, unlock, watermark,
+    WatermarkReport, XmpMode, capabilities, compress_with_options, delete_pages, extract_pages,
+    format_page_number, images_to_pdf, info, markdown_to_pdf, merge_with_options, meta_get,
+    meta_set, meta_strip, number, pdf_to_images, pdf_to_markdown, preview_overlay_page, protect,
+    render_thumbnails_with_options, reorder_pages, rotate_pages, split, unlock, watermark,
 };
 use tauri::{AppHandle, Emitter, State};
 
@@ -502,7 +503,7 @@ pub fn execute_protect_op(
         }
         "unlock" => {
             let opts = UnlockOptions {
-                password: secrecy::SecretString::from(password.to_string()),
+                password: Some(secrecy::SecretString::from(password.to_string())),
                 out: clean_out,
                 force,
                 dry_run: false,
@@ -1037,6 +1038,151 @@ async fn run_protect(
     res.map_err(CommandError::from)
 }
 
+/// Retrieves document metadata fields, custom dictionary keys, and XMP sync status.
+#[tauri::command]
+async fn get_meta(input: String, password: Option<String>) -> Result<MetaGetReport, CommandError> {
+    let input_path = PathBuf::from(input);
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let load_opts = LoadOptions {
+            password: password.map(secrecy::SecretString::from),
+        };
+        let opts = MetaGetOptions {
+            load: load_opts,
+            include_xmp_packet: true,
+        };
+        meta_get(&[input_path], &opts, &NoProgress)
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
+/// Updates PDF metadata and synchronizes XMP on a worker thread.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn run_meta_set(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: String,
+    title: Option<String>,
+    author: Option<String>,
+    subject: Option<String>,
+    keywords: Option<String>,
+    creator: Option<String>,
+    producer: Option<String>,
+    creation_date: Option<String>,
+    mod_date: Option<String>,
+    custom: Vec<(String, String)>,
+    unset: Vec<String>,
+    xmp: String,
+    out: Option<String>,
+    force: bool,
+    dry_run: bool,
+    password: Option<String>,
+) -> Result<MetaSetReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_path = PathBuf::from(input);
+    let out_path = out.map(PathBuf::from);
+
+    let xmp_mode = match xmp.as_str() {
+        "keep" => XmpMode::Keep,
+        "drop" => XmpMode::Drop,
+        _ => XmpMode::Sync,
+    };
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "meta set",
+            cancelled,
+        };
+        let load_opts = LoadOptions {
+            password: password.map(secrecy::SecretString::from),
+        };
+        let custom_map = custom.into_iter().collect();
+        let opts = MetaSetOptions {
+            load: load_opts,
+            title,
+            author,
+            subject,
+            keywords,
+            creator,
+            producer,
+            creation_date,
+            mod_date: mod_date.unwrap_or_else(|| "now".to_string()),
+            custom: custom_map,
+            unset,
+            xmp: xmp_mode,
+            out: out_path,
+            force,
+            dry_run,
+        };
+        meta_set(&input_path, &opts, &progress)
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
+/// Strips identifying metadata from a PDF on a worker thread.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn run_meta_strip(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: String,
+    deep: bool,
+    keep: Vec<String>,
+    out: Option<String>,
+    force: bool,
+    dry_run: bool,
+    password: Option<String>,
+) -> Result<MetaStripReport, CommandError> {
+    state.cancelled.store(false, Ordering::SeqCst);
+    let cancelled = Arc::clone(&state.cancelled);
+    let input_path = PathBuf::from(input);
+    let out_path = out.map(PathBuf::from);
+
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let progress = TauriProgress {
+            app,
+            op: "meta strip",
+            cancelled,
+        };
+        let load_opts = LoadOptions {
+            password: password.map(secrecy::SecretString::from),
+        };
+        let opts = MetaStripOptions {
+            load: load_opts,
+            deep,
+            keep,
+            out: out_path,
+            force,
+            dry_run,
+        };
+        meta_strip(&input_path, &opts, &progress)
+    })
+    .await
+    .map_err(|e| CommandError {
+        code: "internal",
+        message: format!("Worker thread failed: {e}"),
+        hint: None,
+    })?;
+
+    res.map_err(CommandError::from)
+}
+
 /// Reveals a generated file or directory in macOS Finder (`open -R`).
 #[tauri::command]
 fn reveal_in_finder(path: String) -> Result<(), CommandError> {
@@ -1117,6 +1263,9 @@ pub fn run() {
             run_number,
             preview_overlay,
             run_protect,
+            get_meta,
+            run_meta_set,
+            run_meta_strip,
             reveal_in_finder,
             open_path,
             cancel_op,

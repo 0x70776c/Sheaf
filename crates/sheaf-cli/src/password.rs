@@ -191,7 +191,12 @@ impl PasswordResolver {
             }
             let mut content = match std::fs::read_to_string(path) {
                 Ok(c) => c,
-                Err(e) => return Err(SheafError::Io(e)),
+                Err(e) => {
+                    return Err(SheafError::InvalidSelection(format!(
+                        "Password file '{}' not found or unreadable: {e}",
+                        path.display()
+                    )));
+                }
             };
             if content.ends_with("\r\n") {
                 content.truncate(content.len() - 2);

@@ -79,13 +79,7 @@ impl Command for UnlockArgs {
         }
 
         let mut resolver = PasswordResolver::new();
-        let password = resolver
-            .resolve_open_password(&self.password_opts)?
-            .ok_or_else(|| {
-                SheafError::InvalidSelection(
-                    "Missing required password. Specify --password-env VAR, --password-file PATH, or --password-stdin.".to_string(),
-                )
-            })?;
+        let password = resolver.resolve_open_password(&self.password_opts)?;
 
         let opts = UnlockOptions {
             password,

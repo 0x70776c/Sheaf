@@ -11,6 +11,9 @@ import type {
   ImageFormatUi,
   InfoReport,
   MergeReport,
+  MetaGetReport,
+  MetaSetReport,
+  MetaStripReport,
   NumberPositionUi,
   NumberReport,
   OverlayModeUi,
@@ -327,6 +330,78 @@ export async function runProtectCommand(params: RunProtectParams): Promise<Prote
     allowModify: params.allowModify ?? true,
     out: params.out ?? null,
     force: params.force ?? true,
+  });
+}
+
+export async function getMetaCommand(
+  input: string,
+  password?: string | null,
+): Promise<MetaGetReport> {
+  return await invoke<MetaGetReport>('get_meta', {
+    input,
+    password: password ?? null,
+  });
+}
+
+export interface RunMetaSetParams {
+  input: string;
+  title?: string | null;
+  author?: string | null;
+  subject?: string | null;
+  keywords?: string | null;
+  creator?: string | null;
+  producer?: string | null;
+  creationDate?: string | null;
+  modDate?: string | null;
+  custom?: [string, string][];
+  unset?: string[];
+  xmp?: string;
+  out?: string | null;
+  force?: boolean;
+  dryRun?: boolean;
+  password?: string | null;
+}
+
+export async function runMetaSetCommand(params: RunMetaSetParams): Promise<MetaSetReport> {
+  return await invoke<MetaSetReport>('run_meta_set', {
+    input: params.input,
+    title: params.title ?? null,
+    author: params.author ?? null,
+    subject: params.subject ?? null,
+    keywords: params.keywords ?? null,
+    creator: params.creator ?? null,
+    producer: params.producer ?? null,
+    creationDate: params.creationDate ?? null,
+    modDate: params.modDate ?? null,
+    custom: params.custom ?? [],
+    unset: params.unset ?? [],
+    xmp: params.xmp ?? 'sync',
+    out: params.out ?? null,
+    force: params.force ?? true,
+    dryRun: params.dryRun ?? false,
+    password: params.password ?? null,
+  });
+}
+
+export interface RunMetaStripParams {
+  input: string;
+  deep?: boolean;
+  keep?: string[];
+  out?: string | null;
+  force?: boolean;
+  dryRun?: boolean;
+  password?: string | null;
+}
+
+export async function runMetaStripCommand(params: RunMetaStripParams): Promise<MetaStripReport> {
+  return await invoke<MetaStripReport>('run_meta_strip', {
+    input: params.input,
+    deep: params.deep ?? false,
+    keep: params.keep ?? [],
+    out: params.out ?? null,
+    force: params.force ?? true,
+    dryRun: params.dryRun ?? false,
+    password: params.password ?? null,
   });
 }
 

@@ -5,10 +5,102 @@ use std::fmt::Write as _;
 
 use crate::cli::Cli;
 
+fn visible(arg: &clap::Arg) -> bool {
+    !(arg.get_id() == "help" || arg.get_id() == "version" || arg.is_hide_set())
+}
+
+fn arg_label(arg: &clap::Arg) -> String {
+    if let Some(long) = arg.get_long() {
+        if let Some(short) = arg.get_short() {
+            format!("`-{short}, --{long}`")
+        } else {
+            format!("`--{long}`")
+        }
+    } else {
+        format!("`<{}>`", arg.get_id())
+    }
+}
+
+fn arg_value(arg: &clap::Arg) -> String {
+    let takes_value = !matches!(
+        arg.get_action(),
+        clap::ArgAction::SetTrue | clap::ArgAction::SetFalse | clap::ArgAction::Count
+    );
+    if !takes_value {
+        return "-".to_string();
+    }
+    arg.get_value_names()
+        .and_then(|v| v.first().map(|s| format!("`<{s}>`")))
+        .unwrap_or_else(|| "-".to_string())
+}
+
+fn arg_help(arg: &clap::Arg) -> String {
+    let mut help = arg
+        .get_help()
+        .map(|h| h.to_string().replace('\n', " "))
+        .unwrap_or_default();
+    let defaults: Vec<String> = arg
+        .get_default_values()
+        .iter()
+        .map(|v| v.to_string_lossy().into_owned())
+        .collect();
+    if !defaults.is_empty() && !arg.is_positional() {
+        let takes_value = !matches!(
+            arg.get_action(),
+            clap::ArgAction::SetTrue | clap::ArgAction::SetFalse | clap::ArgAction::Count
+        );
+        if takes_value {
+            help.push_str(&format!(" (default: `{}`)", defaults.join(",")));
+        }
+    }
+    let possible: Vec<String> = arg
+        .get_possible_values()
+        .iter()
+        .filter(|v| !v.is_hide_set())
+        .map(|v| format!("`{}`", v.get_name()))
+        .collect();
+    if !possible.is_empty() {
+        help.push_str(&format!(" (values: {})", possible.join(", ")));
+    }
+    help.replace('|', "\\|")
+}
+
+fn anchor(path: &str) -> String {
+    format!("sheaf-{}", path.replace(' ', "-"))
+}
+
+/// Recursively collects visible leaf commands with their full path.
+fn collect_leaves<'a>(
+    cmd: &'a clap::Command,
+    prefix: &str,
+    out: &mut Vec<(String, &'a clap::Command)>,
+) {
+    for sub in cmd.get_subcommands() {
+        if sub.is_hide_set() {
+            continue;
+        }
+        let path = if prefix.is_empty() {
+            sub.get_name().to_string()
+        } else {
+            format!("{prefix} {}", sub.get_name())
+        };
+        if sub.has_subcommands() {
+            collect_leaves(sub, &path, out);
+        } else {
+            out.push((path, sub));
+        }
+    }
+}
+
 /// Generates the complete Markdown documentation for all Sheaf CLI commands and options.
+///
+/// Every visible leaf command (including nested ones such as `pages rotate`) gets its own
+/// section. Global options are derived from the clap definition as well.
 pub fn generate_cli_markdown() -> String {
     let mut out = String::new();
     let root = Cli::command();
+    let mut leaves = Vec::new();
+    collect_leaves(&root, "", &mut leaves);
 
     let _ = writeln!(out, "# Sheaf CLI Reference\n");
     let _ = writeln!(
@@ -17,16 +109,8 @@ pub fn generate_cli_markdown() -> String {
     );
 
     let _ = writeln!(out, "## Table of Contents\n");
-    for sub in root.get_subcommands() {
-        if sub.is_hide_set() {
-            continue;
-        }
-        let _ = writeln!(
-            out,
-            "- [`sheaf {}`](#sheaf-{})",
-            sub.get_name(),
-            sub.get_name()
-        );
+    for (path, _) in &leaves {
+        let _ = writeln!(out, "- [`sheaf {path}`](#{})", anchor(path));
     }
     let _ = writeln!(out);
 
@@ -35,41 +119,25 @@ pub fn generate_cli_markdown() -> String {
         out,
         "These options are supported across all `sheaf` subcommands:\n"
     );
-    let _ = writeln!(out, "| Option | Description |");
-    let _ = writeln!(out, "| :--- | :--- |");
-    let _ = writeln!(
-        out,
-        "| `--json` | Output a single JSON envelope object on stdout |"
-    );
-    let _ = writeln!(
-        out,
-        "| `--dry-run` | Validate inputs and compute execution plan without writing files |"
-    );
-    let _ = writeln!(out, "| `--force` | Overwrite existing output files |");
-    let _ = writeln!(
-        out,
-        "| `-q, --quiet` | Suppress human-readable output except errors |"
-    );
-    let _ = writeln!(
-        out,
-        "| `-v, --verbose` | Emit verbose debug logs on stderr |"
-    );
-    let _ = writeln!(
-        out,
-        "| `--progress <MODE>` | Progress output mode on stderr (`none`, `human`, `json`) |"
-    );
-    let _ = writeln!(
-        out,
-        "| `--no-color` | Disable colored console output (also respects `NO_COLOR`) |\n"
-    );
+    let _ = writeln!(out, "| Option | Value | Description |");
+    let _ = writeln!(out, "| :--- | :--- | :--- |");
+    for arg in root
+        .get_arguments()
+        .filter(|a| visible(a) && a.is_global_set())
+    {
+        let _ = writeln!(
+            out,
+            "| {} | {} | {} |",
+            arg_label(arg),
+            arg_value(arg),
+            arg_help(arg)
+        );
+    }
+    let _ = writeln!(out);
 
-    for sub in root.get_subcommands() {
-        if sub.is_hide_set() {
-            continue;
-        }
-        let name = sub.get_name();
-        let _ = writeln!(out, "## `sheaf {}`\n", name);
-        if let Some(about) = sub.get_about() {
+    for (path, sub) in &leaves {
+        let _ = writeln!(out, "## `sheaf {path}`\n");
+        if let Some(about) = sub.get_long_about().or_else(|| sub.get_about()) {
             let _ = writeln!(out, "{}\n", about);
         }
 
@@ -80,49 +148,57 @@ pub fn generate_cli_markdown() -> String {
         );
         let _ = writeln!(out, "| :--- | :--- | :--- | :--- |");
 
-        for arg in sub.get_arguments() {
-            if arg.get_id() == "help" || arg.get_id() == "version" || arg.is_hide_set() {
-                continue;
-            }
-            let name_str = if let Some(long) = arg.get_long() {
-                if let Some(short) = arg.get_short() {
-                    format!("`-{short}, --{long}`")
-                } else {
-                    format!("`--{long}`")
-                }
-            } else {
-                format!("`<{}>`", arg.get_id())
-            };
-            let value_str = arg
-                .get_value_names()
-                .and_then(|v| v.first().map(|s| format!("`<{s}>`")))
-                .unwrap_or_else(|| "-".to_string());
+        for arg in sub
+            .get_arguments()
+            .filter(|a| visible(a) && !a.is_global_set())
+        {
             let required_str = if arg.is_required_set() { "Yes" } else { "No" };
-            let help_str = arg
-                .get_help()
-                .map(|h| h.to_string().replace('\n', " "))
-                .unwrap_or_default();
-
             let _ = writeln!(
                 out,
-                "| {name_str} | {value_str} | {required_str} | {help_str} |"
+                "| {} | {} | {required_str} | {} |",
+                arg_label(arg),
+                arg_value(arg),
+                arg_help(arg)
             );
         }
         let _ = writeln!(out);
 
         if let Some(after_help) = sub.get_after_help() {
-            let _ = writeln!(out, "### Examples\n");
-            let _ = writeln!(out, "```bash");
+            let mut examples = Vec::new();
+            let mut notes = Vec::new();
             for line in after_help.to_string().lines() {
-                if line.starts_with("Examples:") {
+                let trimmed = line.trim();
+                if trimmed.is_empty()
+                    || trimmed.starts_with("Examples:")
+                    || trimmed.starts_with("Notes:")
+                {
                     continue;
                 }
-                let trimmed = line.trim();
-                if !trimmed.is_empty() {
-                    let _ = writeln!(out, "{trimmed}");
+                if trimmed.starts_with("sheaf ")
+                    || trimmed.starts_with("printf ")
+                    || trimmed.starts_with("export ")
+                    || trimmed.starts_with("SOURCE_DATE_EPOCH")
+                {
+                    examples.push(trimmed.to_string());
+                } else {
+                    notes.push(trimmed.to_string());
                 }
             }
-            let _ = writeln!(out, "```\n");
+            if !notes.is_empty() {
+                let _ = writeln!(out, "### Notes\n");
+                for n in notes {
+                    let _ = writeln!(out, "- {n}");
+                }
+                let _ = writeln!(out);
+            }
+            if !examples.is_empty() {
+                let _ = writeln!(out, "### Examples\n");
+                let _ = writeln!(out, "```bash");
+                for e in examples {
+                    let _ = writeln!(out, "{e}");
+                }
+                let _ = writeln!(out, "```\n");
+            }
         }
     }
 

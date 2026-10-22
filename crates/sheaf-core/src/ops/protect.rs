@@ -58,8 +58,8 @@ impl Default for ProtectOptions {
 /// Options for [`unlock`].
 #[derive(Debug, Clone, Default)]
 pub struct UnlockOptions {
-    /// User or owner password to unlock the encrypted PDF.
-    pub password: SecretString,
+    /// User or owner password to unlock the encrypted PDF (`None` to attempt opening without password).
+    pub password: Option<SecretString>,
     /// Target output PDF path (defaults to `{stem}_unlocked.pdf`).
     pub out: Option<PathBuf>,
     /// Overwrite existing output file if `true`.
@@ -244,7 +244,7 @@ pub fn protect(
 /// use sheaf_core::{NoProgress, UnlockOptions, unlock};
 ///
 /// let opts = UnlockOptions {
-///     password: "secret-password".to_string().into(),
+///     password: Some("secret-password".to_string().into()),
 ///     ..UnlockOptions::default()
 /// };
 /// let report = unlock(Path::new("report_protected.pdf"), &opts, &NoProgress).unwrap();
@@ -292,7 +292,7 @@ pub fn unlock(
         let loaded = load_pdf(
             src,
             &LoadOptions {
-                password: Some(opts.password.clone()),
+                password: opts.password.clone(),
             },
         )?;
         let mut d = loaded.doc;

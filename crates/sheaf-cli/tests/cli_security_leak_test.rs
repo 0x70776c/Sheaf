@@ -134,8 +134,8 @@ fn test_security_secret_leak_canary_never_in_stdout_or_stderr() {
 
     assert!(encrypted_pdf.exists(), "canary_enc.pdf should be generated");
 
-    // Reading commands to test: unlock, info, split, watermark
-    let read_commands = ["unlock", "info", "split", "watermark"];
+    // Reading commands to test: unlock, info, split, watermark, number
+    let read_commands = ["unlock", "info", "split", "watermark", "number"];
 
     for cmd_name in read_commands {
         // Test combinations: --json, --verbose, --progress json, --dry-run, error cases
@@ -188,6 +188,16 @@ fn test_security_secret_leak_canary_never_in_stdout_or_stderr() {
                         "--json".into(),
                         "--force".into(),
                     ],
+                    "number" => vec![
+                        cmd_name.into(),
+                        encrypted_pdf.to_str().unwrap().into(),
+                        "--password-env".into(),
+                        canary_env.into(),
+                        "-o".into(),
+                        temp.path().join("num_out.pdf").to_str().unwrap().into(),
+                        "--json".into(),
+                        "--force".into(),
+                    ],
                     _ => unreachable!(),
                 },
                 None,
@@ -233,6 +243,16 @@ fn test_security_secret_leak_canary_never_in_stdout_or_stderr() {
                         pw_file.to_str().unwrap().into(),
                         "-o".into(),
                         temp.path().join("wm_verb.pdf").to_str().unwrap().into(),
+                        "--verbose".into(),
+                        "--force".into(),
+                    ],
+                    "number" => vec![
+                        cmd_name.into(),
+                        encrypted_pdf.to_str().unwrap().into(),
+                        "--password-file".into(),
+                        pw_file.to_str().unwrap().into(),
+                        "-o".into(),
+                        temp.path().join("num_verb.pdf").to_str().unwrap().into(),
                         "--verbose".into(),
                         "--force".into(),
                     ],
@@ -284,6 +304,16 @@ fn test_security_secret_leak_canary_never_in_stdout_or_stderr() {
                         "json".into(),
                         "--force".into(),
                     ],
+                    "number" => vec![
+                        cmd_name.into(),
+                        encrypted_pdf.to_str().unwrap().into(),
+                        "--password-stdin".into(),
+                        "-o".into(),
+                        temp.path().join("num_prog.pdf").to_str().unwrap().into(),
+                        "--progress".into(),
+                        "json".into(),
+                        "--force".into(),
+                    ],
                     _ => unreachable!(),
                 },
                 Some(CANARY),
@@ -329,6 +359,15 @@ fn test_security_secret_leak_canary_never_in_stdout_or_stderr() {
                         "-o".into(),
                         temp.path().join("wm_dry.pdf").to_str().unwrap().into(),
                     ],
+                    "number" => vec![
+                        cmd_name.into(),
+                        encrypted_pdf.to_str().unwrap().into(),
+                        "--password-env".into(),
+                        canary_env.into(),
+                        "--dry-run".into(),
+                        "-o".into(),
+                        temp.path().join("num_dry.pdf").to_str().unwrap().into(),
+                    ],
                     _ => unreachable!(),
                 },
                 None,
@@ -363,6 +402,14 @@ fn test_security_secret_leak_canary_never_in_stdout_or_stderr() {
                         encrypted_pdf.to_str().unwrap().into(),
                         "--text".into(),
                         "CONFIDENTIAL".into(),
+                        "--pages".into(),
+                        "999".into(), // out of range
+                        "--password-env".into(),
+                        canary_env.into(),
+                    ],
+                    "number" => vec![
+                        cmd_name.into(),
+                        encrypted_pdf.to_str().unwrap().into(),
                         "--pages".into(),
                         "999".into(), // out of range
                         "--password-env".into(),

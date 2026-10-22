@@ -172,7 +172,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let bad_err = unlock(
         &locked_pdf,
         &UnlockOptions {
-            password: secrecy::SecretString::from("wrong-password"),
+            password: Some(secrecy::SecretString::from("wrong-password")),
             out: Some(bad_out.clone()),
             force: false,
             dry_run: false,
@@ -191,7 +191,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let unl_rep = unlock(
         &locked_pdf,
         &UnlockOptions {
-            password: secrecy::SecretString::from("user-pass-123"),
+            password: Some(secrecy::SecretString::from("user-pass-123")),
             out: Some(unlocked_pdf.clone()),
             force: false,
             dry_run: false,
@@ -268,7 +268,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     let plain_rep = unlock(
         &unlocked_pdf,
         &UnlockOptions {
-            password: secrecy::SecretString::from("any"),
+            password: Some(secrecy::SecretString::from("any")),
             out: Some(plain_copy.clone()),
             force: false,
             dry_run: false,
@@ -291,4 +291,195 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
     )
     .expect_err("cancelled");
     assert!(matches!(cancel_err, SheafError::Cancelled));
+}
+
+#[test]
+#[allow(clippy::disallowed_methods, clippy::let_and_return)]
+fn test_protect_permission_bits_and_qpdf_encryption_verification() {
+    let src = fixtures_dir().join("fixture_a_2p.pdf");
+    let temp = tempfile::tempdir().expect("tempdir");
+
+    // Case 1: No print
+    let p_no_print = temp.path().join("no_print.pdf");
+    protect(
+        &src,
+        &ProtectOptions {
+            load: LoadOptions::none(),
+            user_password: secrecy::SecretString::from("pw123"),
+            owner_password: None,
+            allow_print: false,
+            allow_copy: true,
+            allow_modify: true,
+            out: Some(p_no_print.clone()),
+            force: false,
+            dry_run: false,
+        },
+        &NoProgress,
+    )
+    .expect("protect no print");
+
+    // Case 2: No copy
+    let p_no_copy = temp.path().join("no_copy.pdf");
+    protect(
+        &src,
+        &ProtectOptions {
+            load: LoadOptions::none(),
+            user_password: secrecy::SecretString::from("pw123"),
+            owner_password: None,
+            allow_print: true,
+            allow_copy: false,
+            allow_modify: true,
+            out: Some(p_no_copy.clone()),
+            force: false,
+            dry_run: false,
+        },
+        &NoProgress,
+    )
+    .expect("protect no copy");
+
+    // Case 3: No modify
+    let p_no_modify = temp.path().join("no_modify.pdf");
+    protect(
+        &src,
+        &ProtectOptions {
+            load: LoadOptions::none(),
+            user_password: secrecy::SecretString::from("pw123"),
+            owner_password: None,
+            allow_print: true,
+            allow_copy: true,
+            allow_modify: false,
+            out: Some(p_no_modify.clone()),
+            force: false,
+            dry_run: false,
+        },
+        &NoProgress,
+    )
+    .expect("protect no modify");
+
+    // Inspect /Encrypt /P values
+    let get_p_val = |path: &Path| -> i64 {
+        let bytes = std::fs::read(path).expect("read pdf bytes");
+        let raw_doc = lopdf::Document::load_mem(&bytes).expect("load raw doc");
+        let enc_obj = raw_doc
+            .trailer
+            .get(b"Encrypt")
+            .expect("Encrypt entry in trailer");
+        let enc_dict = match enc_obj {
+            lopdf::Object::Reference(id) => raw_doc.get_object(*id).unwrap().as_dict().unwrap(),
+            lopdf::Object::Dictionary(d) => d,
+            _ => panic!("unexpected Encrypt obj"),
+        };
+        enc_dict.get(b"P").unwrap().as_i64().unwrap()
+    };
+
+    let p_val_no_print = get_p_val(&p_no_print);
+    let p_val_no_copy = get_p_val(&p_no_copy);
+    let p_val_no_modify = get_p_val(&p_no_modify);
+
+    // Verify /P bits differ according to permissions set
+    assert_ne!(p_val_no_print, p_val_no_copy);
+    assert_ne!(p_val_no_print, p_val_no_modify);
+    assert_ne!(p_val_no_copy, p_val_no_modify);
+
+    // Verify qpdf --show-encryption confirms AES-256 (V=5, R=6) and permissions
+    if let Ok(qpdf) = Command::new("qpdf")
+        .args(["--show-encryption", p_no_print.to_str().unwrap()])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&qpdf.stdout);
+        assert!(
+            stdout.contains("AESv3") || stdout.contains("R = 6") || stdout.contains("256"),
+            "qpdf should confirm 256-bit AES encryption (R=6, AESv3):\n{stdout}"
+        );
+        assert!(
+            stdout.contains("print low resolution: not allowed")
+                && stdout.contains("print high resolution: not allowed"),
+            "qpdf should indicate print not allowed:\n{stdout}"
+        );
+    }
+
+    if let Ok(qpdf) = Command::new("qpdf")
+        .args(["--show-encryption", p_no_copy.to_str().unwrap()])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&qpdf.stdout);
+        assert!(
+            stdout.contains("extract for any purpose: not allowed"),
+            "qpdf should indicate copy not allowed:\n{stdout}"
+        );
+    }
+
+    if let Ok(qpdf) = Command::new("qpdf")
+        .args(["--show-encryption", p_no_modify.to_str().unwrap()])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&qpdf.stdout);
+        assert!(
+            stdout.contains("modify annotations: not allowed")
+                || stdout.contains("modify anything: not allowed"),
+            "qpdf should indicate modify not allowed:\n{stdout}"
+        );
+    }
+}
+
+#[test]
+fn test_protect_unlock_roundtrip_preserves_page_count_and_text() {
+    let src = fixtures_dir().join("fixture_b_3p.pdf");
+    let temp = tempfile::tempdir().expect("tempdir");
+
+    let orig_doc = load_pdf(&src, &LoadOptions::none()).expect("load orig").doc;
+    let orig_pages = orig_doc.get_pages().len();
+    let mut orig_texts = Vec::new();
+    for p in 1..=orig_pages {
+        orig_texts.push(
+            orig_doc
+                .extract_text(&[p as u32])
+                .expect("extract orig text"),
+        );
+    }
+
+    let locked_pdf = temp.path().join("roundtrip_locked.pdf");
+    protect(
+        &src,
+        &ProtectOptions {
+            load: LoadOptions::none(),
+            user_password: secrecy::SecretString::from("roundtrip-pw"),
+            owner_password: None,
+            allow_print: true,
+            allow_copy: true,
+            allow_modify: true,
+            out: Some(locked_pdf.clone()),
+            force: false,
+            dry_run: false,
+        },
+        &NoProgress,
+    )
+    .expect("protect roundtrip");
+
+    let unlocked_pdf = temp.path().join("roundtrip_unlocked.pdf");
+    unlock(
+        &locked_pdf,
+        &UnlockOptions {
+            password: Some(secrecy::SecretString::from("roundtrip-pw")),
+            out: Some(unlocked_pdf.clone()),
+            force: false,
+            dry_run: false,
+        },
+        &NoProgress,
+    )
+    .expect("unlock roundtrip");
+
+    let unl_doc = load_pdf(&unlocked_pdf, &LoadOptions::none())
+        .expect("load unl")
+        .doc;
+    assert_eq!(unl_doc.get_pages().len(), orig_pages);
+
+    for p in 1..=orig_pages {
+        let unl_txt = unl_doc.extract_text(&[p as u32]).expect("extract unl text");
+        assert_eq!(
+            unl_txt,
+            orig_texts[p - 1],
+            "Text on page {p} must match original"
+        );
+    }
 }

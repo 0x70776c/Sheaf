@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use sheaf_core::{
-    LoadOptions, NoProgress, PageOpOptions, PageSelection, PagesReport, SheafError, delete_pages,
+    LoadOptions, PageOpOptions, PageSelection, PagesReport, SheafError, delete_pages,
     extract_pages, reorder_pages, rotate_pages,
 };
 
@@ -14,16 +14,8 @@ fn parse_selection_for_file(
     spec: &str,
     load_opts: &LoadOptions,
 ) -> Result<PageSelection, SheafError> {
-    let info_report =
-        sheaf_core::ops::info::info_with_options(&[input.to_path_buf()], load_opts, &NoProgress)?;
-    let file_info = info_report
-        .files
-        .first()
-        .ok_or(SheafError::EmptySelection)?;
-    if file_info.encrypted && file_info.pages.is_none() {
-        return Err(SheafError::Encrypted);
-    }
-    let total_pages = file_info.pages.unwrap_or(0);
+    let loaded = sheaf_core::load_pdf(input, load_opts)?;
+    let total_pages = u32::try_from(loaded.doc.get_pages().len()).unwrap_or(0);
     PageSelection::parse(spec, total_pages)
 }
 
