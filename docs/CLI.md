@@ -497,6 +497,11 @@ Strip metadata, PieceInfo, and object-level metadata from PDF
 | `--password-file` | `<PASSWORD_FILE>` | No | Read the open password from a file |
 | `--password-stdin` | - | No | Read the open password from standard input (values: `true`, `false`) |
 
+### Notes
+
+- Hinweis:
+- Strip entfernt keine sichtbaren Inhalte, eingebetteten Schriftnamen, Bild-EXIF oder Dateinamen eingebetteter Anhänge.
+
 ### Examples
 
 ```bash

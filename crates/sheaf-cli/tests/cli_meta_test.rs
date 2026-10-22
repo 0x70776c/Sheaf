@@ -371,3 +371,135 @@ fn test_cli_meta_strip_dry_run() {
     assert!(out.status.success());
     assert!(!target.exists(), "Dry run must not create output file");
 }
+
+#[test]
+fn test_cli_meta_output_exists_exit_7() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_a_2p.pdf");
+    let temp = tempfile::tempdir().expect("tempdir");
+    let existing_path = temp.path().join("existing.pdf");
+    std::fs::write(&existing_path, b"%PDF-1.4 dummy\n").expect("write existing");
+
+    let out = sheaf_cmd()
+        .args([
+            "meta",
+            "set",
+            src.to_str().unwrap(),
+            "--title",
+            "Conflict Title",
+            "-o",
+            existing_path.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run meta set target exists");
+    assert_eq!(out.status.code(), Some(7), "Existing output without --force must exit 7");
+}
+
+#[test]
+fn test_cli_meta_multi_get_corrupted_file_exit_3() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src_ok = fixtures.join("fixture_a_2p.pdf");
+    let src_corrupt = fixtures.join("corrupted.pdf");
+
+    let out = sheaf_cmd()
+        .args([
+            "meta",
+            "get",
+            src_ok.to_str().unwrap(),
+            src_corrupt.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run meta get with corrupted file");
+
+    assert_eq!(out.status.code(), Some(3), "Corrupted PDF in meta get must return exit 3");
+    let val: serde_json::Value = serde_json::from_slice(&out.stdout).expect("parse json");
+    assert_eq!(val["ok"], false);
+    assert_eq!(val["error"]["code"], "invalid_pdf");
+}
+
+#[test]
+fn test_cli_meta_secret_leak_canary() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_a_2p.pdf");
+    let temp = tempfile::tempdir().expect("tempdir");
+    let canary = "CANARY_META_PW_SECRET_987654";
+
+    // 1. Lock a file with the canary
+    let locked_path = temp.path().join("locked.pdf");
+    let prot_out = sheaf_cmd()
+        .args([
+            "protect",
+            src.to_str().unwrap(),
+            "--new-password-stdin",
+            "-o",
+            locked_path.to_str().unwrap(),
+        ])
+        .write_stdin(format!("{canary}\n"))
+        .output()
+        .expect("protect with canary");
+    assert!(prot_out.status.success());
+
+    // 2. meta get with canary password
+    let get_out = sheaf_cmd()
+        .args([
+            "meta",
+            "get",
+            locked_path.to_str().unwrap(),
+            "--password-stdin",
+            "--json",
+        ])
+        .write_stdin(format!("{canary}\n"))
+        .output()
+        .expect("meta get with canary");
+    assert!(get_out.status.success());
+    let get_stdout = String::from_utf8_lossy(&get_out.stdout);
+    let get_stderr = String::from_utf8_lossy(&get_out.stderr);
+    assert!(!get_stdout.contains(canary), "Canary must not leak to stdout in meta get");
+    assert!(!get_stderr.contains(canary), "Canary must not leak to stderr in meta get");
+
+    // 3. meta set with canary password
+    let set_out_path = temp.path().join("set_unlocked.pdf");
+    let set_out = sheaf_cmd()
+        .args([
+            "meta",
+            "set",
+            locked_path.to_str().unwrap(),
+            "--title",
+            "New Secret Title",
+            "--password-stdin",
+            "-o",
+            set_out_path.to_str().unwrap(),
+            "--json",
+        ])
+        .write_stdin(format!("{canary}\n"))
+        .output()
+        .expect("meta set with canary");
+    assert!(set_out.status.success());
+    let set_stdout = String::from_utf8_lossy(&set_out.stdout);
+    let set_stderr = String::from_utf8_lossy(&set_out.stderr);
+    assert!(!set_stdout.contains(canary), "Canary must not leak to stdout in meta set");
+    assert!(!set_stderr.contains(canary), "Canary must not leak to stderr in meta set");
+
+    // 4. meta strip with canary password
+    let strip_out_path = temp.path().join("strip_unlocked.pdf");
+    let strip_out = sheaf_cmd()
+        .args([
+            "meta",
+            "strip",
+            locked_path.to_str().unwrap(),
+            "--password-stdin",
+            "-o",
+            strip_out_path.to_str().unwrap(),
+            "--json",
+        ])
+        .write_stdin(format!("{canary}\n"))
+        .output()
+        .expect("meta strip with canary");
+    assert!(strip_out.status.success());
+    let strip_stdout = String::from_utf8_lossy(&strip_out.stdout);
+    let strip_stderr = String::from_utf8_lossy(&strip_out.stderr);
+    assert!(!strip_stdout.contains(canary), "Canary must not leak to stdout in meta strip");
+    assert!(!strip_stderr.contains(canary), "Canary must not leak to stderr in meta strip");
+}
