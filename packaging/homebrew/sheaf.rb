@@ -5,7 +5,7 @@ class Sheaf < Formula
   license any_of: ["MIT", "Apache-2.0"]
 
   url "https://github.com/0x70776c/Sheaf/releases/download/v#{version}/Sheaf-cli-#{version}-universal.tar.gz"
-  sha256 "cb9de3e6de9b921b9fce327dc48dae7863ac600aecc6c8da5a91e115b052ce7e"
+  sha256 "cc752ad97ac8bedd51cdd208ed9df651efcb56d9b9d16fee8c070f1d0d6034ab"
 
   def install
     bin.install "sheaf"
