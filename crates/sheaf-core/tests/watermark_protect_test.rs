@@ -294,6 +294,7 @@ fn protect_and_unlock_roundtrip_and_wrong_password() {
 }
 
 #[test]
+#[allow(clippy::disallowed_methods, clippy::let_and_return)]
 fn test_protect_permission_bits_and_qpdf_encryption_verification() {
     let src = fixtures_dir().join("fixture_a_2p.pdf");
     let temp = tempfile::tempdir().expect("tempdir");
@@ -368,8 +369,7 @@ fn test_protect_permission_bits_and_qpdf_encryption_verification() {
             lopdf::Object::Dictionary(d) => d,
             _ => panic!("unexpected Encrypt obj"),
         };
-        let p_val = enc_dict.get(b"P").unwrap().as_i64().unwrap();
-        p_val
+        enc_dict.get(b"P").unwrap().as_i64().unwrap()
     };
 
     let p_val_no_print = get_p_val(&p_no_print);

@@ -674,7 +674,7 @@ pub enum MetaCommands {
 
     /// Strip metadata, PieceInfo, and object-level metadata from PDF
     #[command(
-        after_help = "Examples:\n  sheaf meta strip input.pdf -o cleaned.pdf\n  sheaf meta strip sensitive.pdf --deep --keep Title -o anonymized.pdf --json"
+        after_help = "Examples:\n  sheaf meta strip input.pdf -o cleaned.pdf\n  sheaf meta strip sensitive.pdf --deep --keep Title -o anonymized.pdf --json\n\nHinweis:\n  Strip entfernt keine sichtbaren Inhalte, eingebetteten Schriftnamen, Bild-EXIF oder Dateinamen eingebetteter Anhänge."
     )]
     Strip(MetaStripArgs),
 }

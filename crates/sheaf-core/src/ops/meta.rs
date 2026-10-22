@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
 use lopdf::{Dictionary, Document, Object, StringFormat};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::error::ensure_not_overwriting_inputs;
 use crate::fs::{check_output_path, write_atomic};
@@ -1359,7 +1360,318 @@ fn update_xmp_xml_text(
     Some(out)
 }
 
+// ============================================================================
+// 7. `meta_strip` Operation
+// ============================================================================
+
+/// Options for [`meta_strip`].
+#[derive(Debug, Clone, Default)]
+pub struct MetaStripOptions {
+    /// Decryption options for protected files.
+    pub load: LoadOptions,
+    /// Also strip metadata from annotations (/T, /M, /CreationDate, /Subj).
+    pub deep: bool,
+    /// Standard fields to preserve in Info dictionary (e.g. "title", "author").
+    pub keep: Vec<String>,
+    /// Target output PDF path (defaults to `{stem}_clean.pdf`).
+    pub out: Option<PathBuf>,
+    /// Overwrite existing output file if `true`.
+    pub force: bool,
+    /// Compute plan and report without writing output file if `true`.
+    pub dry_run: bool,
+}
+
+/// Breakdown of metadata removed during [`meta_strip`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetaStripRemoved {
+    /// List of Info dictionary keys removed.
+    pub info_keys: Vec<String>,
+    /// Whether XMP Catalog `/Metadata` was removed.
+    pub xmp: bool,
+    /// Number of `/PieceInfo` dictionaries removed from Catalog and Pages.
+    pub piece_info: usize,
+    /// Number of object-level `/Metadata` entries removed from Pages and XObjects.
+    pub object_metadata: usize,
+    /// Number of annotation metadata fields removed (when `--deep` is enabled).
+    pub annotation_fields: usize,
+    /// Whether trailer `/ID` was regenerated.
+    pub trailer_id_regenerated: bool,
+}
+
+/// Report returned by [`meta_strip`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetaStripReport {
+    /// Input file path.
+    pub input: PathBuf,
+    /// Output file path.
+    pub output: PathBuf,
+    /// Breakdown of removed metadata.
+    pub removed: MetaStripRemoved,
+    /// Warnings generated during stripping (e.g. DCT JPEG EXIF warning).
+    pub warnings: Vec<String>,
+    /// Whether this was a dry-run execution.
+    pub dry_run: bool,
+}
+
+/// Strips identifying metadata on document, catalog, page, and object levels.
+pub fn meta_strip(
+    input: &Path,
+    opts: &MetaStripOptions,
+    p: &dyn Progress,
+) -> Result<MetaStripReport, SheafError> {
+    if !input.exists() {
+        return Err(SheafError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("File not found: {}", input.display()),
+        )));
+    }
+
+    let out_path = match &opts.out {
+        Some(path) => path.clone(),
+        None => {
+            let parent = input.parent().unwrap_or_else(|| Path::new("."));
+            let stem = sanitize_stem(input);
+            parent.join(format!("{stem}_clean.pdf"))
+        }
+    };
+    ensure_not_overwriting_inputs(&[input.to_path_buf()], &out_path)?;
+    if !opts.dry_run {
+        check_output_path(&out_path, opts.force)?;
+    }
+
+    if p.is_cancelled() {
+        return Err(SheafError::Cancelled);
+    }
+    p.report(10, 100);
+
+    let loaded = load_pdf(input, &opts.load)?;
+    let mut doc = loaded.doc;
+
+    let mut removed = MetaStripRemoved::default();
+    let mut warnings = Vec::new();
+
+    // 1. Info dictionary
+    if let Ok(info_obj) = doc.trailer.get(b"Info") {
+        let (info_id, info_dict) = match info_obj {
+            Object::Reference(id) => {
+                let d = doc.get_dictionary(*id).ok().cloned();
+                (Some(*id), d)
+            }
+            Object::Dictionary(d) => (None, Some(d.clone())),
+            _ => (None, None),
+        };
+
+        if let Some(mut d) = info_dict {
+            let mut keys_to_remove = Vec::new();
+            for (k, _) in d.iter() {
+                let key_str = String::from_utf8_lossy(k);
+                let should_keep = opts
+                    .keep
+                    .iter()
+                    .any(|keep_field| keep_field.eq_ignore_ascii_case(&key_str));
+                if !should_keep {
+                    keys_to_remove.push((k.clone(), key_str.into_owned()));
+                }
+            }
+
+            for (k_bytes, k_str) in keys_to_remove {
+                d.remove(&k_bytes);
+                removed.info_keys.push(k_str);
+            }
+
+            if !opts.dry_run {
+                if d.is_empty() {
+                    doc.trailer.remove(b"Info");
+                    if let Some(id) = info_id {
+                        doc.objects.remove(&id);
+                    }
+                } else if let Some(id) = info_id {
+                    doc.objects.insert(id, Object::Dictionary(d));
+                } else {
+                    let new_id = doc.add_object(Object::Dictionary(d));
+                    doc.trailer.set("Info", Object::Reference(new_id));
+                }
+            }
+        }
+    }
+
+    // 2. Catalog /Metadata and /PieceInfo
+    if let Ok(catalog_id) = doc.trailer.get(b"Root").and_then(|r| r.as_reference())
+        && let Ok(catalog) = doc.get_dictionary_mut(catalog_id)
+    {
+        if catalog.has(b"Metadata") {
+            removed.xmp = true;
+            if !opts.dry_run {
+                catalog.remove(b"Metadata");
+            }
+        }
+        if catalog.has(b"PieceInfo") {
+            removed.piece_info += 1;
+            if !opts.dry_run {
+                catalog.remove(b"PieceInfo");
+            }
+        }
+    }
+
+    if p.is_cancelled() {
+        return Err(SheafError::Cancelled);
+    }
+    p.report(30, 100);
+
+    // 3. Pages /PieceInfo, /Metadata, and /Annots (if --deep)
+    let page_ids: Vec<lopdf::ObjectId> = doc.get_pages().values().copied().collect();
+    for &page_id in &page_ids {
+        if let Ok(page_dict) = doc.get_dictionary_mut(page_id) {
+            if page_dict.has(b"PieceInfo") {
+                removed.piece_info += 1;
+                if !opts.dry_run {
+                    page_dict.remove(b"PieceInfo");
+                }
+            }
+            if page_dict.has(b"Metadata") {
+                removed.object_metadata += 1;
+                if !opts.dry_run {
+                    page_dict.remove(b"Metadata");
+                }
+            }
+
+            // Annotation cleansing with --deep
+            if opts.deep
+                && let Ok(annots_obj) = page_dict.get(b"Annots")
+            {
+                let annot_refs: Vec<lopdf::ObjectId> = match annots_obj {
+                    Object::Array(arr) => {
+                        arr.iter().filter_map(|o| o.as_reference().ok()).collect()
+                    }
+                    Object::Reference(id) => vec![*id],
+                    _ => Vec::new(),
+                };
+
+                for annot_id in annot_refs {
+                    if let Ok(annot_dict) = doc.get_dictionary_mut(annot_id) {
+                        for &field in &[b"T" as &[u8], b"M", b"CreationDate", b"Subj"] {
+                            if annot_dict.has(field) {
+                                removed.annotation_fields += 1;
+                                if !opts.dry_run {
+                                    annot_dict.remove(field);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Object-level /Metadata in XObjects (e.g. embedded image / form XObjects)
+        let xobj_ids: Vec<lopdf::ObjectId> = if let Ok(res) = doc.get_page_resources(page_id) {
+            if let Some(res_dict) = res.0 {
+                if let Ok(xobjs) = res_dict.get(b"XObject").and_then(|o| o.as_dict()) {
+                    xobjs
+                        .iter()
+                        .filter_map(|(_k, o)| o.as_reference().ok())
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+
+        for xobj_id in xobj_ids {
+            if let Ok(xobj_dict) = doc.get_dictionary_mut(xobj_id)
+                && xobj_dict.has(b"Metadata")
+            {
+                removed.object_metadata += 1;
+                if !opts.dry_run {
+                    xobj_dict.remove(b"Metadata");
+                }
+            }
+        }
+    }
+
+    if p.is_cancelled() {
+        return Err(SheafError::Cancelled);
+    }
+    p.report(60, 100);
+
+    // 5. DCT stream check (JPEG EXIF warning)
+    let mut dct_count = 0usize;
+    for obj in doc.objects.values() {
+        if let Object::Stream(s) = obj
+            && let Ok(filter) = s.dict.get(b"Filter")
+        {
+            match filter {
+                Object::Name(n) if n == b"DCTDecode" => dct_count += 1,
+                Object::Array(arr)
+                    if arr
+                        .iter()
+                        .any(|o| o.as_name().map(|n| n == b"DCTDecode").unwrap_or(false)) =>
+                {
+                    dct_count += 1;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if dct_count > 0 {
+        warnings.push(format!(
+            "{dct_count} JPEG-Bilder können EXIF-Daten enthalten, diese bleiben erhalten."
+        ));
+    }
+
+    // 6. Regenerate Trailer /ID
+    if !opts.dry_run {
+        let eff_now = get_effective_now();
+        let mut hasher1 = Sha256::new();
+        hasher1.update(input.to_string_lossy().as_bytes());
+        hasher1.update(eff_now.timestamp().to_be_bytes());
+        hasher1.update(b"sheaf-strip-id-1");
+        let h1 = &hasher1.finalize()[..16];
+
+        let mut hasher2 = Sha256::new();
+        hasher2.update(input.to_string_lossy().as_bytes());
+        hasher2.update(eff_now.timestamp().to_be_bytes());
+        hasher2.update(b"sheaf-strip-id-2");
+        let h2 = &hasher2.finalize()[..16];
+
+        let id_a = Object::String(h1.to_vec(), StringFormat::Hexadecimal);
+        let id_b = Object::String(h2.to_vec(), StringFormat::Hexadecimal);
+        doc.trailer.set("ID", Object::Array(vec![id_a, id_b]));
+    }
+    removed.trailer_id_regenerated = true;
+
+    if p.is_cancelled() {
+        return Err(SheafError::Cancelled);
+    }
+    p.report(80, 100);
+
+    if !opts.dry_run {
+        write_atomic(&out_path, opts.force, |temp_file| {
+            let mut writer = BufWriter::new(temp_file);
+            doc.save_to(&mut writer)
+                .map_err(|e| std::io::Error::other(format!("Failed to write PDF: {e}")))?;
+            writer.flush()?;
+            Ok(())
+        })?;
+    }
+
+    p.report(100, 100);
+
+    Ok(MetaStripReport {
+        input: input.to_path_buf(),
+        output: out_path,
+        removed,
+        warnings,
+        dry_run: opts.dry_run,
+    })
+}
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

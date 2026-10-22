@@ -255,3 +255,119 @@ fn test_cli_meta_set_validation_errors() {
         .expect("run meta set conflict");
     assert_eq!(out_conflict.status.code(), Some(2));
 }
+
+#[test]
+fn test_cli_meta_strip_default_and_keep() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_a_2p.pdf");
+    let temp = tempfile::tempdir().expect("tempdir");
+    let stripped_path = temp.path().join("stripped.pdf");
+
+    let out = sheaf_cmd()
+        .args([
+            "meta",
+            "strip",
+            src.to_str().unwrap(),
+            "-o",
+            stripped_path.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run meta strip");
+    assert!(out.status.success(), "meta strip must succeed");
+
+    let val: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("parse json output from meta strip");
+    assert_eq!(val["ok"], true);
+    let removed = &val["data"]["removed"];
+    assert!(removed["trailer_id_regenerated"].as_bool().unwrap());
+    assert!(stripped_path.exists());
+
+    // Inspect stripped file: Info dictionary should be completely removed
+    let opts = sheaf_core::LoadOptions::default();
+    let loaded = sheaf_core::load_pdf(&stripped_path, &opts).expect("load stripped pdf");
+    assert!(
+        loaded.doc.trailer.get(b"Info").is_err(),
+        "Info dictionary should be completely stripped when no keys kept"
+    );
+
+    // Now test with --keep Title
+    let kept_path = temp.path().join("kept.pdf");
+    let out_keep = sheaf_cmd()
+        .args([
+            "meta",
+            "strip",
+            src.to_str().unwrap(),
+            "--keep",
+            "title",
+            "-o",
+            kept_path.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run meta strip keep");
+    assert!(out_keep.status.success());
+    let loaded_kept = sheaf_core::load_pdf(&kept_path, &opts).expect("load kept pdf");
+    if let Ok(info_obj) = loaded_kept.doc.trailer.get(b"Info")
+        && let Ok(info_dict) = loaded_kept
+            .doc
+            .get_dictionary(info_obj.as_reference().unwrap())
+    {
+        assert!(info_dict.has(b"Title"), "Title should be kept");
+    }
+}
+
+#[test]
+fn test_cli_meta_strip_jpeg_warning_and_deep() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_photo.pdf");
+    let temp = tempfile::tempdir().expect("tempdir");
+    let stripped_path = temp.path().join("stripped_photo.pdf");
+
+    let out = sheaf_cmd()
+        .args([
+            "meta",
+            "strip",
+            src.to_str().unwrap(),
+            "--deep",
+            "-o",
+            stripped_path.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run meta strip photo");
+    assert!(out.status.success());
+
+    let val: serde_json::Value = serde_json::from_slice(&out.stdout).expect("parse json");
+    let warnings = val["warnings"].as_array().expect("warnings array");
+    assert!(
+        warnings.iter().any(|w| w
+            .as_str()
+            .unwrap()
+            .contains("JPEG-Bilder können EXIF-Daten enthalten")),
+        "Must contain JPEG EXIF warning"
+    );
+}
+
+#[test]
+fn test_cli_meta_strip_dry_run() {
+    let fixtures = workspace_root().join("tests").join("fixtures");
+    let src = fixtures.join("fixture_a_2p.pdf");
+    let temp = tempfile::tempdir().expect("tempdir");
+    let target = temp.path().join("should_not_exist.pdf");
+
+    let out = sheaf_cmd()
+        .args([
+            "meta",
+            "strip",
+            src.to_str().unwrap(),
+            "--dry-run",
+            "-o",
+            target.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .expect("run meta strip dry-run");
+    assert!(out.status.success());
+    assert!(!target.exists(), "Dry run must not create output file");
+}

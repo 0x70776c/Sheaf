@@ -48,13 +48,13 @@ fn test_number_placeholders_and_start() {
     // Page 1 should NOT have overlay font
     let p1_id = *loaded.doc.get_pages().get(&1).unwrap();
     let p1_dict = loaded.doc.get_dictionary(p1_id).unwrap();
-    if let Ok(res) = p1_dict.get(b"Resources").and_then(|o| o.as_dict()) {
-        if let Ok(fonts) = res.get(b"Font").and_then(|o| o.as_dict()) {
-            assert!(
-                !fonts.has(b"SheafF0"),
-                "Page 1 was not selected for numbering"
-            );
-        }
+    if let Ok(res) = p1_dict.get(b"Resources").and_then(|o| o.as_dict())
+        && let Ok(fonts) = res.get(b"Font").and_then(|o| o.as_dict())
+    {
+        assert!(
+            !fonts.has(b"SheafF0"),
+            "Page 1 was not selected for numbering"
+        );
     }
 
     // Page 2 and 3 MUST have overlay font

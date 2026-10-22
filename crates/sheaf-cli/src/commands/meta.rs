@@ -1,11 +1,11 @@
 use sheaf_core::{
-    LoadOptions, MetaGetOptions, MetaGetReport, MetaSetOptions, MetaSetReport, SheafError, XmpMode,
-    meta_get, meta_set,
+    LoadOptions, MetaGetOptions, MetaGetReport, MetaSetOptions, MetaSetReport, MetaStripOptions,
+    MetaStripReport, SheafError, XmpMode, meta_get, meta_set, meta_strip,
 };
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use crate::cli::{MetaArgs, MetaCommands, MetaGetArgs, MetaSetArgs};
+use crate::cli::{MetaArgs, MetaCommands, MetaGetArgs, MetaSetArgs, MetaStripArgs};
 use crate::commands::{Command, Ctx, Outcome};
 use crate::password::PasswordResolver;
 
@@ -17,6 +17,8 @@ pub enum MetaReport {
     Get(MetaGetReport),
     /// Report returned by `sheaf meta set`.
     Set(MetaSetReport),
+    /// Report returned by `sheaf meta strip`.
+    Strip(MetaStripReport),
 }
 
 impl Command for MetaArgs {
@@ -34,9 +36,7 @@ impl Command for MetaArgs {
         match &self.action {
             MetaCommands::Get(args) => run_meta_get(args, ctx),
             MetaCommands::Set(args) => run_meta_set(args, ctx),
-            MetaCommands::Strip(_) => Err(SheafError::Unsupported(
-                "meta strip will be implemented in 11B.4".to_string(),
-            )),
+            MetaCommands::Strip(args) => run_meta_strip(args, ctx),
         }
     }
 
@@ -44,6 +44,7 @@ impl Command for MetaArgs {
         match report {
             MetaReport::Get(rep) => format_meta_get_human(rep),
             MetaReport::Set(rep) => format_meta_set_human(rep),
+            MetaReport::Strip(rep) => format_meta_strip_human(rep),
         }
     }
 }
@@ -259,5 +260,81 @@ fn format_meta_set_human(report: &MetaSetReport) -> String {
             let _ = write!(out, "  {:<14} {} → {}", entry.field, old_str, new_str);
         }
     }
+    out
+}
+
+fn run_meta_strip(args: &MetaStripArgs, ctx: &Ctx) -> Result<Outcome<MetaReport>, SheafError> {
+    let mut resolver = PasswordResolver::new();
+    let pw = resolver.resolve_open_password(&args.password_opts)?;
+    let load_opts = LoadOptions { password: pw };
+
+    let opts = MetaStripOptions {
+        load: load_opts,
+        deep: args.deep,
+        keep: args.keep.clone(),
+        out: args.out.clone(),
+        force: ctx.global.force,
+        dry_run: ctx.global.dry_run,
+    };
+
+    let report = meta_strip(&args.input, &opts, &ctx.progress)?;
+    let mut warnings = resolver.warnings;
+    warnings.extend(report.warnings.clone());
+
+    Ok(Outcome {
+        report: MetaReport::Strip(report),
+        warnings,
+        dry_run: ctx.global.dry_run,
+        failure: None,
+    })
+}
+
+fn format_meta_strip_human(report: &MetaStripReport) -> String {
+    let mut out = String::new();
+    let action_str = if report.dry_run {
+        "Plan for stripping metadata from"
+    } else {
+        "Stripped metadata from"
+    };
+    let _ = writeln!(
+        out,
+        "{action_str} {} → {}",
+        report.input.display(),
+        report.output.display()
+    );
+
+    let _ = writeln!(
+        out,
+        "  Info keys removed:       {:?}",
+        report.removed.info_keys
+    );
+    let xmp_status = if report.removed.xmp {
+        "removed"
+    } else {
+        "none"
+    };
+    let _ = writeln!(out, "  XMP Catalog /Metadata:   {xmp_status}");
+    let _ = writeln!(
+        out,
+        "  PieceInfo dictionaries:  {}",
+        report.removed.piece_info
+    );
+    let _ = writeln!(
+        out,
+        "  Object-level /Metadata:  {}",
+        report.removed.object_metadata
+    );
+    let _ = writeln!(
+        out,
+        "  Annotation fields:       {}",
+        report.removed.annotation_fields
+    );
+    let id_status = if report.removed.trailer_id_regenerated {
+        "regenerated"
+    } else {
+        "unchanged"
+    };
+    let _ = write!(out, "  Trailer /ID:             {id_status}");
+
     out
 }
