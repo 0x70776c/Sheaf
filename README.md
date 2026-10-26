@@ -20,7 +20,7 @@
 
 ## What is Sheaf?
 
-Sheaf is a privacy-first, ultra-fast PDF manipulation toolkit designed natively for macOS. It exists because working with PDFs shouldn't require uploading sensitive tax returns, contracts, or bank statements to third-party cloud services or subscribing to heavyweight suites.
+Sheaf is a privacy-first, fast PDF manipulation toolkit designed natively for macOS. It exists because working with PDFs shouldn't require uploading sensitive tax returns, contracts, or bank statements to third-party cloud services or subscribing to heavyweight suites.
 
 Built from the ground up with a dual nature:
 1. **First-Class CLI for Agentic Workflows:** Purpose-built for AI agents (Claude Code, Cursor, Antigravity, LLM tool-calling), headless automation, and shell scripts with a strict machine-readable contract.
