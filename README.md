@@ -125,17 +125,20 @@ This script automatically:
 For local development and testing, ensure PDFium (`libpdfium.dylib`) is available in `vendor/pdfium/lib/` or `/opt/homebrew/lib/` (running `./scripts/build-universal.sh` once automatically fetches and places universal PDFium in `vendor/pdfium/lib/libpdfium.dylib`):
 
 ```bash
-# Build the CLI locally
+# 1. Build the CLI locally
 cargo build --release -p sheaf-cli
 
 # Inspect CLI capabilities
 ./target/release/sheaf capabilities --json
 
-# Typecheck & build the Svelte 5 desktop frontend
+# 2. Desktop Application (Svelte 5 + Tauri 2)
 cd apps/desktop
 npm install
 npm run check
 npm run build
+
+# Start the desktop app in development mode
+npm run tauri dev
 ```
 
 ### Desktop Application (`apps/desktop`)
