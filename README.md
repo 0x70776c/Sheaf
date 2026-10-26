@@ -12,8 +12,8 @@
 <p align="center">
   <a href="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/0x70776c/Sheaf/ci.yml?branch=main&label=CI&style=flat-square" alt="CI" /></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue?style=flat-square" alt="License" /></a>
-  <img src="https://img.shields.io/badge/Version-0.1.0-emerald?style=flat-square" alt="Version 0.1.0" />
-  <img src="https://img.shields.io/badge/macOS-Universal-indigo?style=flat-square" alt="macOS Universal" />
+  <img src="https://img.shields.io/badge/Version-0.1.0-10b981?style=flat-square" alt="Version 0.1.0" />
+  <img src="https://img.shields.io/badge/macOS-Universal-6366f1?style=flat-square" alt="macOS Universal" />
   <img src="https://img.shields.io/badge/Offline-100%25-green?style=flat-square" alt="100% Offline" />
 </p>
 
@@ -23,7 +23,7 @@
 
 Sheaf is a privacy-first, ultra-fast PDF manipulation toolkit designed natively for macOS. It exists because manipulating PDFs shouldn't require uploading sensitive tax returns, contracts, or bank statements to third-party web services or subscribing to heavyweight suites.
 
-- **100% Offline:** Zero network calls, zero analytics, zero telemetry. Network dependencies (`reqwest`, `hyper`, `curl`) are actively banned at compile time.
+- **100% Offline:** Zero network calls, zero analytics, zero telemetry. Direct network crates are banned via cargo-deny in CI.
 - **Non-Destructive & Safe:** Input files are strictly read-only. Outputs are written atomically via scratch files to prevent corruption.
 - **Dual Interface:** High-performance automation CLI (`sheaf`) with a strict machine-readable JSON contract, and an elegant native macOS desktop application.
 - **Universal Binary:** Single native download for both Apple Silicon (M1/M2/M3/M4) and Intel Macs.
@@ -39,16 +39,12 @@ When downloading `.dmg` or `.tar.gz` packages via a web browser, macOS automatic
 
 ### How to Launch Sheaf:
 
-- **Option A (Finder - Recommended):** Right-click (or `Control` + Click) on `Sheaf.app` in `/Applications`, choose **Open**, and click **Open** in the confirmation dialog. You only need to do this once.
-- **Option B (Terminal Quarantine Removal):**
+- **Option A (System Settings - Recommended):** If macOS blocks the first launch, open **System Settings** → **Privacy & Security**, scroll down to the Security section, and click **Open Anyway** ("Trotzdem öffnen").
+- **Option B (Terminal Quarantine Removal):** Strip the quarantine attribute directly:
   ```bash
-  xattr -d com.apple.quarantine /Applications/Sheaf.app
+  xattr -dr com.apple.quarantine /Applications/Sheaf.app
   ```
-- **Option C (CLI via Homebrew Tap - No Quarantine):**
-  ```bash
-  brew tap 0x70776c/sheaf packaging/homebrew
-  brew install sheaf
-  ```
+- **Option C (Finder Context Menu - Older macOS versions):** Right-click (or `Control` + Click) on `Sheaf.app` in `/Applications`, choose **Open**, and click **Open** in the confirmation dialog.
 - **Option D (Build from Source):** Building locally from source creates local binaries without quarantine flags.
 
 ---
@@ -84,10 +80,10 @@ gh attestation verify Sheaf-0.1.0-universal.dmg --owner 0x70776c
 | **Page Extraction** | ✅ `sheaf pages extract` | ✅ | Save page subsets into new documents |
 | **Rasterize / Render** | ✅ `sheaf render` | ✅ | PNG output with PDFium thumbnail caching |
 | **Compress** | ✅ `sheaf compress` | ✅ | Stream deflate, image downsampling, grayscale |
-| **Convert** | ✅ `sheaf convert` | ✅ | PDF ⇄ PNG/JPEG/TIFF/WebP & PDF ⇄ Markdown |
+| **Convert** | ✅ `sheaf convert` | ✅ | PDF ⇄ PNG/JPEG & PDF ⇄ Markdown |
 | **Watermark** | ✅ `sheaf watermark` | ✅ | Text overlay with rotation, color, opacity |
 | **Page Numbers** | ✅ `sheaf number` | ✅ | Dynamic `{n}` and `{total}` header/footer stamping |
-| **Encryption (Protect)**| ✅ `sheaf protect` | ✅ | AES-256 / AES-128 with print/copy/modify permissions |
+| **Encryption (Protect)**| ✅ `sheaf protect` | ✅ | AES-256 with print/copy/modify permissions |
 | **Decryption (Unlock)** | ✅ `sheaf unlock` | ✅ | Safe password ingestion (`env`, `file`, `stdin`) |
 | **Metadata Management** | ✅ `sheaf meta` | ✅ | Inspect, modify, or strip Info & XMP streams |
 | **Document Inspection** | ✅ `sheaf info` | ✅ | PDF version, page count, security, dimensions |
@@ -123,6 +119,13 @@ This script automatically:
 4. Creates and ad-hoc signs `dist/Sheaf.app` and `dist/Sheaf-0.1.0-universal.dmg`.
 5. Packages `dist/Sheaf-cli-0.1.0-universal.tar.gz` with bundled completions and universal libraries.
 6. Runs all 7 automated verification checks.
+
+### Development Setup
+
+For local development and testing, ensure PDFium (`libpdfium.dylib`) is available in `vendor/pdfium/lib/` or `/opt/homebrew/lib/` (running `./scripts/build-universal.sh` once automatically fetches and places universal PDFium in `vendor/pdfium/lib/libpdfium.dylib`):
+
+```bash
+# Build the CLI locally
 cargo build --release -p sheaf-cli
 
 # Inspect CLI capabilities
@@ -306,7 +309,7 @@ sheaf number thesis.pdf --format "Page {n} of {total}" --position bottom-right -
 ### 9. `sheaf protect` & `sheaf unlock`
 Encrypt (`protect`) a PDF with user/owner passwords and print/copy/modify permissions, or decrypt (`unlock`) an encrypted PDF (returns exit code `4` with `"code": "wrong_password"` if the password is incorrect). Passwords are never passed via command-line arguments, but via environment variables, files, or stdin.
 
-> **Hinweis:** `--no-print`, `--no-copy`, `--no-modify` sind Hinweise an den PDF-Viewer. Manche Programme ignorieren sie. Echter Schutz entsteht nur durch das User-Passwort.
+> **Note:** Permissions (`--no-print`, `--no-copy`, `--no-modify`) are advisory hints to PDF viewers. Some applications ignore them. Genuine protection is provided only by the user password.
 
 ```bash
 # Encrypt a PDF with user and owner passwords from environment variables
@@ -347,7 +350,7 @@ sheaf info a.pdf b.pdf --json
 
 ---
 
-### 11. `sheaf verify`
+### 12. `sheaf verify`
 Verify PDF files for structural integrity (loads cleanly, valid catalog & page tree, resolvable page content streams and resources). With `--deep`, also runs `qpdf --check` when available.
 
 ```bash
@@ -357,7 +360,7 @@ sheaf verify out/*.pdf --deep --json
 
 ---
 
-### 12. `sheaf capabilities`
+### 13. `sheaf capabilities`
 Self-description of CLI version, schema version, supported commands, exit codes, and external tool availability (`qpdf`, `pdfium`).
 
 ```bash
@@ -366,7 +369,7 @@ sheaf capabilities --json
 
 ---
 
-### 13. `sheaf completions`
+### 14. `sheaf completions`
 Generate shell completion scripts for `bash`, `zsh`, or `fish`.
 
 ```bash
@@ -375,15 +378,6 @@ source <(sheaf completions zsh)
 
 # Or save to your zsh completion directory
 sheaf completions zsh > ~/.zfunc/_sheaf
-```
-
----
-
-### 14. `sheaf docs`
-Generate or export CLI reference documentation.
-
-```bash
-sheaf docs
 ```
 
 ---
