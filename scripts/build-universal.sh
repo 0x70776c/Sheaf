@@ -49,6 +49,7 @@ if [[ "$PDFIUM_ARCHS" != *"x86_64"* ]] || [[ "$PDFIUM_ARCHS" != *"arm64"* ]]; th
 fi
 
 # Update local vendor/pdfium with universal library as well
+mkdir -p "$ROOT_DIR/vendor/pdfium/lib"
 cp "$UNIVERSAL_PDFIUM" "$ROOT_DIR/vendor/pdfium/lib/libpdfium.dylib"
 
 # 2. CLI universal bauen
@@ -62,7 +63,8 @@ lipo -create -output "$CLI_UNIVERSAL" \
     "$ROOT_DIR/target/x86_64-apple-darwin/release/sheaf"
 
 chmod +x "$CLI_UNIVERSAL"
-echo "Ad-hoc signing CLI binary..."
+echo "Ad-hoc signing CLI binary (after stripping extended attributes)..."
+xattr -cr "$CLI_UNIVERSAL"
 codesign --force --sign - --timestamp=none "$CLI_UNIVERSAL"
 
 # 3. Desktop-App universal bauen
@@ -85,7 +87,8 @@ echo "Embedding universal PDFium into Sheaf.app/Contents/Frameworks/..."
 mkdir -p "$APP_STAGE/Contents/Frameworks"
 cp "$UNIVERSAL_PDFIUM" "$APP_STAGE/Contents/Frameworks/libpdfium.dylib"
 
-echo "Ad-hoc signing Sheaf.app (inside-out)..."
+echo "Ad-hoc signing Sheaf.app (inside-out, stripping extended attributes)..."
+xattr -cr "$APP_STAGE"
 codesign --force --sign - --timestamp=none "$APP_STAGE/Contents/Frameworks/libpdfium.dylib"
 codesign --force --sign - --timestamp=none "$APP_STAGE/Contents/MacOS/sheaf-desktop"
 codesign --force --sign - --timestamp=none --deep "$APP_STAGE"
@@ -93,6 +96,7 @@ codesign --force --sign - --timestamp=none --deep "$APP_STAGE"
 # Also place clean Sheaf.app into dist/
 rm -rf "$DIST_DIR/Sheaf.app"
 (cd "$TMP_BUILD" && tar -cf - Sheaf.app) | (cd "$DIST_DIR" && tar -xf -)
+xattr -cr "$DIST_DIR/Sheaf.app" 2>/dev/null || true
 
 # 4. DMG erzeugen
 echo "[4/7] Creating universal DMG..."
@@ -104,17 +108,21 @@ rm -rf "$DMG_STAGE"
 mkdir -p "$DMG_STAGE"
 ditto "$APP_STAGE" "$DMG_STAGE/Sheaf.app"
 ln -s /Applications "$DMG_STAGE/Applications"
+xattr -cr "$DMG_STAGE"
 
 hdiutil create -volname "Sheaf" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG_PATH"
+xattr -cr "$DMG_PATH"
 codesign --force --sign - --timestamp=none "$DMG_PATH"
 
-# 5. CLI-Tarball erzeugen
+# 5. CLI-Tarball erzeugen (Layout: bin/sheaf, lib/libpdfium.dylib, completions/, docs)
 echo "[5/7] Creating CLI tarball..."
 TAR_STAGE="$TMP_BUILD/cli-stage"
 rm -rf "$TAR_STAGE"
-mkdir -p "$TAR_STAGE/lib" "$TAR_STAGE/completions"
+mkdir -p "$TAR_STAGE/bin" "$TAR_STAGE/lib" "$TAR_STAGE/completions"
 
-cp "$CLI_UNIVERSAL" "$TAR_STAGE/sheaf"
+cp "$CLI_UNIVERSAL" "$TAR_STAGE/bin/sheaf"
+# Root symlink to bin/sheaf for direct invocation convenience
+(cd "$TAR_STAGE" && ln -sf "bin/sheaf" "sheaf")
 cp "$UNIVERSAL_PDFIUM" "$TAR_STAGE/lib/libpdfium.dylib"
 cp "$ROOT_DIR/LICENSE-MIT" "$TAR_STAGE/"
 cp "$ROOT_DIR/LICENSE-APACHE" "$TAR_STAGE/"
@@ -149,17 +157,45 @@ V3=$(lipo -archs "$APP_STAGE/Contents/Frameworks/libpdfium.dylib")
 echo "  Result: $V3"
 [[ "$V3" == *"x86_64"* && "$V3" == *"arm64"* ]]
 
-echo "Verification 4: codesign --verify --deep --strict Sheaf.app"
-codesign --verify --deep --strict "$APP_STAGE"
+echo "Verification 4a: codesign --verify --deep --strict Sheaf.app (staged)"
+codesign --verify --deep --strict --verbose=2 "$APP_STAGE"
+
+echo "Verification 4b: codesign --verify --deep --strict Sheaf.app INSIDE mounted DMG"
+VERIFY_MOUNT="$TMP_BUILD/dmg-verify-mount"
+mkdir -p "$VERIFY_MOUNT"
+hdiutil attach "$DMG_PATH" -mountpoint "$VERIFY_MOUNT" -nobrowse -readonly
+codesign --verify --deep --strict --verbose=2 "$VERIFY_MOUNT/Sheaf.app"
+hdiutil detach "$VERIFY_MOUNT"
+rm -rf "$VERIFY_MOUNT"
 
 echo "Verification 5: codesign --verify --strict dist/sheaf"
-codesign --verify --strict "$DIST_DIR/sheaf"
+codesign --verify --strict --verbose=2 "$DIST_DIR/sheaf"
 
-echo "Verification 6: arch -arm64 dist/sheaf --version"
-arch -arm64 "$DIST_DIR/sheaf" --version
+echo "Verification 6: Unpacking tarball and running end-to-end tests (arm64 & x86_64 Rosetta)"
+TAR_VERIFY="$TMP_BUILD/tarball-verify"
+rm -rf "$TAR_VERIFY"
+mkdir -p "$TAR_VERIFY"
+tar -xzf "$TAR_PATH" -C "$TAR_VERIFY"
 
-echo "Verification 7: arch -x86_64 dist/sheaf --version (Rosetta)"
-arch -x86_64 "$DIST_DIR/sheaf" --version
+echo "  Verification 6a: arm64 capabilities (env -u PDFIUM_LIB_PATH)"
+env -u PDFIUM_LIB_PATH arch -arm64 "$TAR_VERIFY/bin/sheaf" capabilities --json > "$TAR_VERIFY/arm64_caps.json"
+grep -q '"ok":true' "$TAR_VERIFY/arm64_caps.json"
+
+echo "  Verification 6b: arm64 render from tarball (env -u PDFIUM_LIB_PATH, --no-cache)"
+env -u PDFIUM_LIB_PATH arch -arm64 "$TAR_VERIFY/bin/sheaf" render "$ROOT_DIR/tests/fixtures/fixture_12p.pdf" --page 1 --width 160 --no-cache -o "$TAR_VERIFY/arm64_test.png" --json > "$TAR_VERIFY/arm64_render.json"
+grep -q '"ok":true' "$TAR_VERIFY/arm64_render.json"
+[ -f "$TAR_VERIFY/arm64_test.png" ]
+
+echo "  Verification 7a: x86_64 Rosetta capabilities (env -u PDFIUM_LIB_PATH)"
+env -u PDFIUM_LIB_PATH arch -x86_64 "$TAR_VERIFY/bin/sheaf" capabilities --json > "$TAR_VERIFY/x64_caps.json"
+grep -q '"ok":true' "$TAR_VERIFY/x64_caps.json"
+
+echo "  Verification 7b: x86_64 Rosetta render from tarball (env -u PDFIUM_LIB_PATH, --no-cache)"
+env -u PDFIUM_LIB_PATH arch -x86_64 "$TAR_VERIFY/bin/sheaf" render "$ROOT_DIR/tests/fixtures/fixture_12p.pdf" --page 1 --width 160 --no-cache -o "$TAR_VERIFY/x64_test.png" --json > "$TAR_VERIFY/x64_render.json"
+grep -q '"ok":true' "$TAR_VERIFY/x64_render.json"
+[ -f "$TAR_VERIFY/x64_test.png" ]
+
+rm -rf "$TAR_VERIFY"
 
 echo "=== Universal Build and Verification Succeeded! ==="
 cat "$DIST_DIR/SHA256SUMS"

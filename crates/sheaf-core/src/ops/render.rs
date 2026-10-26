@@ -149,6 +149,7 @@ fn init_pdfium_bindings() -> Result<Pdfium, String> {
         && let Some(exe_dir) = exe_path.parent()
     {
         candidate_paths.push(exe_dir.join("libpdfium.dylib"));
+        candidate_paths.push(exe_dir.join("lib/libpdfium.dylib"));
         candidate_paths.push(exe_dir.join("../lib/libpdfium.dylib"));
         candidate_paths.push(exe_dir.join("../Frameworks/libpdfium.dylib"));
         candidate_paths.push(exe_dir.join("../Resources/lib/libpdfium.dylib"));
