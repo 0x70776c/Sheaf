@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-10-26
 
-Initial open-source release of Sheaf — a fast, 100% offline PDF toolkit for macOS.
+Initial open-source release of Sheaf — a fast, local-first PDF toolkit for macOS.
 
 ### Features
 - **Merge (`sheaf merge`)**: Combine multiple PDF documents preserving page order and bookmarks hierarchy.
@@ -33,4 +33,4 @@ Initial open-source release of Sheaf — a fast, 100% offline PDF toolkit for ma
   - Interactive page thumbnail grid with multi-selection (`⇧+Click`, `⌘+Click`, `⌘A`).
   - Command Palette (`⌘K`) for quick navigation.
   - Side panels for Merge, Split, Pages, Compress, Convert, Watermark, Number, Protect/Unlock, and Metadata.
-  - 100% offline: strict CSP, zero analytics, zero network calls.
+  - Local execution: strict CSP, zero analytics, zero network calls.

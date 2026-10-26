@@ -34,7 +34,7 @@ Built from the ground up with a dual nature:
 - **Headless & Non-Interactive by Contract:** Sheaf never opens interactive prompts, prompts for confirmation, or blocks on unprovided flags. Missing arguments fail immediately with clear, structured error codes and actionable recovery hints.
 - **Safe Secret Handling:** Passwords are never passed as command-line arguments (preventing leaks via `ps` or shell history). They are ingested safely via environment variables, file paths, or stdin.
 - **Atomic File Operations:** All write operations write to temporary files in the target directory and rename them atomically. Original files are never modified in place, and interrupted agent runs never leave corrupted PDF fragments behind.
-- **Local Execution:** 100% of PDF processing happens locally on your machine with zero analytics and zero cloud uploads. Direct network dependencies are banned via CI linting.
+- **Local Execution:** PDF processing happens locally on your machine with zero analytics and zero cloud uploads. Direct network dependencies are banned via CI linting.
 
 ---
 
@@ -250,7 +250,7 @@ sheaf render report.pdf --pages "1-20" --width 160 -o thumbs/ --json
 ---
 
 ### 5. `sheaf compress`
-Compress a PDF file by resampling embedded Image XObjects, deduplicating identical streams, and compacting PDF structure—while keeping all vector text 100% selectable.
+Compress a PDF file by resampling embedded Image XObjects, deduplicating identical streams, and compacting PDF structure—while preserving selectable vector text.
 If a document cannot be reduced further, original bytes are preserved and `"already_optimal": true` is reported.
 
 **Presets:**
