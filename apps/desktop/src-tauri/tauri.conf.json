@@ -15,8 +15,8 @@
         "title": "Sheaf",
         "width": 980,
         "height": 680,
-        "minWidth": 760,
-        "minHeight": 520,
+        "minWidth": 900,
+        "minHeight": 600,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "transparent": true

@@ -10,7 +10,6 @@
     ArrowUpDown,
     Lock,
     LockOpen,
-    Settings,
   } from '@lucide/svelte';
   import Sidebar from './lib/components/Sidebar.svelte';
   import DropZone from './lib/components/DropZone.svelte';
@@ -876,44 +875,46 @@
       <header
         class="titlebar drag-region"
         data-tauri-drag-region
+        onmousedown={startWindowDrag}
         onpointerdown={startWindowDrag}
       >
         <div
           class="titlebar-title drag-region"
           data-tauri-drag-region
+          onmousedown={startWindowDrag}
           onpointerdown={startWindowDrag}
         >
-          <span class="app-name">Sheaf</span>
-          <span class="title-sep" aria-hidden="true">·</span>
-          <span class="tool-title">{currentToolMeta.label}</span>
+          <span class="app-name" data-tauri-drag-region>Sheaf</span>
+          <span class="title-sep" data-tauri-drag-region aria-hidden="true">·</span>
+          <span class="tool-title" data-tauri-drag-region>{currentToolMeta.label}</span>
           {#if primaryFile}
-            <span class="title-sep" aria-hidden="true">·</span>
+            <span class="title-sep" data-tauri-drag-region aria-hidden="true">·</span>
             {#if !primaryFile.encrypted}
-              <span class="lock-status-badge unencrypted" title={t.unencryptedDesc}>
-                <LockOpen size={12} strokeWidth={2} />
-                <span>{t.unencrypted}</span>
+              <span class="lock-status-badge unencrypted drag-region" data-tauri-drag-region title={t.unencryptedDesc}>
+                <LockOpen size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.unencrypted}</span>
               </span>
             {:else if isReadOnly}
-              <span class="lock-status-badge readonly" title={t.readOnlyDesc}>
-                <Lock size={12} strokeWidth={2} />
-                <span>{t.readOnly}</span>
+              <span class="lock-status-badge readonly drag-region" data-tauri-drag-region title={t.readOnlyDesc}>
+                <Lock size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.readOnly}</span>
               </span>
             {:else if sessionPassword}
-              <span class="lock-status-badge unlocked" title={t.unlockedDesc}>
-                <Lock size={12} strokeWidth={2} />
-                <span>{t.unlocked}</span>
+              <span class="lock-status-badge unlocked drag-region" data-tauri-drag-region title={t.unlockedDesc}>
+                <Lock size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.unlocked}</span>
               </span>
             {:else}
-              <span class="lock-status-badge locked" title={t.protectedDesc}>
-                <Lock size={12} strokeWidth={2} />
-                <span>{t.protected}</span>
+              <span class="lock-status-badge locked drag-region" data-tauri-drag-region title={t.protectedDesc}>
+                <Lock size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.protected}</span>
               </span>
             {/if}
           {/if}
         </div>
 
-        <div class="titlebar-actions no-drag">
-          {#if hasWorkspaceInput}
+        {#if hasWorkspaceInput}
+          <div class="titlebar-actions no-drag">
             <button
               type="button"
               class="ghost-btn"
@@ -932,20 +933,8 @@
               <X size={14} strokeWidth={1.5} aria-hidden="true" />
               <span>{t.clearFiles}</span>
             </button>
-          {/if}
-          <button
-            type="button"
-            class="ghost-btn"
-            onclick={() => {
-              settingsDialogOpen = true;
-            }}
-            aria-label={t.settings}
-            title={t.settings}
-          >
-            <Settings size={14} strokeWidth={1.5} aria-hidden="true" />
-            <span>{t.settings}</span>
-          </button>
-        </div>
+          </div>
+        {/if}
       </header>
 
       {#if errorBanner}
@@ -2260,6 +2249,7 @@
 
   .titlebar {
     height: var(--titlebar-height);
+    min-height: var(--titlebar-height);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -2271,6 +2261,7 @@
     -webkit-backdrop-filter: var(--glass-blur);
     cursor: grab;
     user-select: none;
+    -webkit-user-select: none;
   }
 
   .titlebar:active {

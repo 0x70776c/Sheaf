@@ -46,6 +46,7 @@
   <div
     class="titlebar-spacer drag-region"
     data-tauri-drag-region
+    onmousedown={startWindowDrag}
     onpointerdown={startWindowDrag}
   ></div>
 

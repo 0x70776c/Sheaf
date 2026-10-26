@@ -1214,6 +1214,19 @@ fn reveal_in_finder(path: String) -> Result<(), CommandError> {
 /// Opens a generated PDF file or directory using macOS default application (`open`).
 #[tauri::command]
 fn open_path(path: String) -> Result<(), CommandError> {
+    if path.starts_with("https://github.com/0x70776c/Sheaf") {
+        let status = StdCommand::new("open").arg(&path).status();
+        return match status {
+            Ok(s) if s.success() => Ok(()),
+            Ok(s) => Err(CommandError {
+                code: "io",
+                message: format!("open exited with status {s}"),
+                hint: None,
+            }),
+            Err(e) => Err(CommandError::from(SheafError::Io(e))),
+        };
+    }
+
     let target = PathBuf::from(&path);
     if !target.exists() {
         return Err(CommandError::from(SheafError::Io(std::io::Error::new(

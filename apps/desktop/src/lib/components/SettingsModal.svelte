@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { Check, Globe, Moon, ShieldCheck, Sun, Monitor, X } from '@lucide/svelte';
+  import { Check, Globe, Moon, ShieldCheck, Sun, Monitor, X, ExternalLink } from '@lucide/svelte';
   import type { Language } from '../i18n';
   import { translations } from '../i18n';
   import type { ThemePreference } from '../types';
+  import { openPathInSystem } from '../tauri';
 
   interface Props {
     open: boolean;
@@ -133,6 +134,49 @@
                 <span class="app-version">v0.1.0</span>
               </div>
               <p class="app-sub">{t.appSubtitle}</p>
+            </div>
+          </div>
+
+          <div class="about-meta-grid">
+            <div class="meta-row">
+              <span class="meta-label">Version</span>
+              <span class="meta-val">0.1.0</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Commit</span>
+              <button
+                type="button"
+                class="link-val"
+                onclick={() => void openPathInSystem('https://github.com/0x70776c/Sheaf/commit/2907e7f')}
+                title="View commit on GitHub"
+              >
+                <code>2907e7f</code>
+                <ExternalLink size={11} strokeWidth={2} />
+              </button>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">{lang === 'de' ? 'Lizenz' : 'License'}</span>
+              <button
+                type="button"
+                class="link-val"
+                onclick={() => void openPathInSystem('https://github.com/0x70776c/Sheaf/blob/main/LICENSE-MIT')}
+                title="View MIT / Apache 2.0 License"
+              >
+                <span>MIT / Apache-2.0</span>
+                <ExternalLink size={11} strokeWidth={2} />
+              </button>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">{lang === 'de' ? 'Drittanbieter' : 'Third-Party'}</span>
+              <button
+                type="button"
+                class="link-val"
+                onclick={() => void openPathInSystem('https://github.com/0x70776c/Sheaf/blob/main/THIRD_PARTY_LICENSES.md')}
+                title="View THIRD_PARTY_LICENSES.md"
+              >
+                <span>THIRD_PARTY_LICENSES</span>
+                <ExternalLink size={11} strokeWidth={2} />
+              </button>
             </div>
           </div>
 
@@ -345,6 +389,61 @@
     font-size: 12px;
     color: var(--text-muted);
     margin-top: 2px;
+  }
+
+  .about-meta-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: var(--space-3);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  .meta-label {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .meta-val {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .link-val {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: opacity var(--transition-fast);
+  }
+
+  .link-val:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+  }
+
+  .link-val code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    padding: 1px 4px;
+    background-color: var(--surface-hover);
+    border-radius: 4px;
   }
 
   .guarantee-badge {
