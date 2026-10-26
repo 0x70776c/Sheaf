@@ -5,7 +5,7 @@
 <h1 align="center">Sheaf</h1>
 
 <p align="center">
-  <strong>Fast, minimalist, 100% offline PDF toolkit for macOS</strong><br />
+  <strong>Fast, minimalist, offline PDF toolkit for macOS</strong><br />
   Apple Silicon (arm64) & Intel (x86_64) Universal
 </p>
 
