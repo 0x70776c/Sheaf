@@ -876,37 +876,39 @@
       <header
         class="titlebar drag-region"
         data-tauri-drag-region
+        onmousedown={startWindowDrag}
         onpointerdown={startWindowDrag}
       >
         <div
           class="titlebar-title drag-region"
           data-tauri-drag-region
+          onmousedown={startWindowDrag}
           onpointerdown={startWindowDrag}
         >
-          <span class="app-name">Sheaf</span>
-          <span class="title-sep" aria-hidden="true">·</span>
-          <span class="tool-title">{currentToolMeta.label}</span>
+          <span class="app-name" data-tauri-drag-region>Sheaf</span>
+          <span class="title-sep" data-tauri-drag-region aria-hidden="true">·</span>
+          <span class="tool-title" data-tauri-drag-region>{currentToolMeta.label}</span>
           {#if primaryFile}
-            <span class="title-sep" aria-hidden="true">·</span>
+            <span class="title-sep" data-tauri-drag-region aria-hidden="true">·</span>
             {#if !primaryFile.encrypted}
-              <span class="lock-status-badge unencrypted" title={t.unencryptedDesc}>
-                <LockOpen size={12} strokeWidth={2} />
-                <span>{t.unencrypted}</span>
+              <span class="lock-status-badge unencrypted drag-region" data-tauri-drag-region title={t.unencryptedDesc}>
+                <LockOpen size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.unencrypted}</span>
               </span>
             {:else if isReadOnly}
-              <span class="lock-status-badge readonly" title={t.readOnlyDesc}>
-                <Lock size={12} strokeWidth={2} />
-                <span>{t.readOnly}</span>
+              <span class="lock-status-badge readonly drag-region" data-tauri-drag-region title={t.readOnlyDesc}>
+                <Lock size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.readOnly}</span>
               </span>
             {:else if sessionPassword}
-              <span class="lock-status-badge unlocked" title={t.unlockedDesc}>
-                <Lock size={12} strokeWidth={2} />
-                <span>{t.unlocked}</span>
+              <span class="lock-status-badge unlocked drag-region" data-tauri-drag-region title={t.unlockedDesc}>
+                <Lock size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.unlocked}</span>
               </span>
             {:else}
-              <span class="lock-status-badge locked" title={t.protectedDesc}>
-                <Lock size={12} strokeWidth={2} />
-                <span>{t.protected}</span>
+              <span class="lock-status-badge locked drag-region" data-tauri-drag-region title={t.protectedDesc}>
+                <Lock size={12} strokeWidth={2} data-tauri-drag-region />
+                <span data-tauri-drag-region>{t.protected}</span>
               </span>
             {/if}
           {/if}
@@ -2260,6 +2262,7 @@
 
   .titlebar {
     height: var(--titlebar-height);
+    min-height: var(--titlebar-height);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -2271,6 +2274,7 @@
     -webkit-backdrop-filter: var(--glass-blur);
     cursor: grab;
     user-select: none;
+    -webkit-user-select: none;
   }
 
   .titlebar:active {
