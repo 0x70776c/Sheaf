@@ -1,5 +1,5 @@
 class Sheaf < Formula
-  desc "Fast, 100% offline PDF toolkit for macOS"
+  desc "Fast, local PDF toolkit for macOS"
   homepage "https://github.com/0x70776c/Sheaf"
   version "0.1.0"
   license any_of: ["MIT", "Apache-2.0"]

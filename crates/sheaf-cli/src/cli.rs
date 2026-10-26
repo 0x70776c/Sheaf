@@ -55,7 +55,7 @@ pub struct GlobalArgs {
 #[command(
     name = "sheaf",
     version = concat!(env!("CARGO_PKG_VERSION"), " (commit ", env!("SHEAF_GIT_HASH"), " ", env!("SHEAF_GIT_DATE"), ")"),
-    about = "Fast, 100% offline PDF toolkit for macOS",
+    about = "Fast, local PDF toolkit for macOS — engineered for developers & agentic workflows",
     after_help = "Examples:\n  sheaf merge a.pdf b.pdf -o combined.pdf\n  sheaf split report.pdf --ranges \"1-3,8-\" -o out/\n  sheaf pages rotate report.pdf --pages \"1-3\" --degrees 90 -o rotated.pdf\n  sheaf info report.pdf --json"
 )]
 pub struct Cli {

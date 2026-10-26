@@ -11,7 +11,7 @@ Sheaf is structured as a Cargo workspace:
 - `tests/fixtures`: Standard test PDF documents.
 
 ### Strict Rules
-1. **100% Offline**: Sheaf must never make network connections or perform telemetry. Banned crates include `reqwest`, `hyper`, `tokio-tungstenite`, and `curl` (enforced by `cargo deny`).
+1. **Local-Only**: Sheaf must never make network connections or perform telemetry. Banned crates include `reqwest`, `hyper`, `tokio-tungstenite`, and `curl` (enforced by `cargo deny`).
 2. **No Secret Leaks**: Passwords must always use `secrecy::SecretString` and must never be exposed via argv, debug logs, error messages, or JSON reports.
 3. **Library Code Safety**: No `.unwrap()` or `.expect()` in `sheaf-core`. Errors are typed with `thiserror`.
 4. **Code Quality**: `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --check` must pass cleanly.

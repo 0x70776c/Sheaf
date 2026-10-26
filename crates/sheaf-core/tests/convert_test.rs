@@ -159,7 +159,7 @@ fn roundtrip_markdown_to_pdf_and_pdf_to_markdown() {
     let sample_md = "\
 # Sheaf Architecture Guide
 
-Sheaf is a **100% offline** PDF toolkit for macOS written in Rust.
+Sheaf is a fast local PDF toolkit for macOS written in Rust.
 
 ## Core Principles
 

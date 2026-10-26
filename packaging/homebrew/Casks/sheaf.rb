@@ -4,7 +4,7 @@ cask "sheaf" do
 
   url "https://github.com/0x70776c/Sheaf/releases/download/v#{version}/Sheaf-#{version}-universal.dmg"
   name "Sheaf"
-  desc "Fast, 100% offline PDF toolkit for macOS"
+  desc "Fast, local PDF toolkit for macOS"
   homepage "https://github.com/0x70776c/Sheaf"
 
   app "Sheaf.app"

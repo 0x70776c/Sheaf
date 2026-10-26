@@ -5,28 +5,36 @@
 <h1 align="center">Sheaf</h1>
 
 <p align="center">
-  <strong>Fast, minimalist, offline PDF toolkit for macOS</strong><br />
+  <strong>Fast, local PDF toolkit for macOS — engineered for developers & agentic workflows</strong><br />
   Apple Silicon (arm64) & Intel (x86_64) Universal
 </p>
 
 <p align="center">
   <a href="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/0x70776c/Sheaf/ci.yml?branch=main&label=CI&style=flat-square" alt="CI" /></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue?style=flat-square" alt="License" /></a>
-  <img src="https://img.shields.io/badge/Version-0.1.0-10b981?style=flat-square" alt="Version 0.1.0" />
   <img src="https://img.shields.io/badge/macOS-Universal-6366f1?style=flat-square" alt="macOS Universal" />
-  <img src="https://img.shields.io/badge/Offline-100%25-green?style=flat-square" alt="100% Offline" />
+  <img src="https://img.shields.io/badge/CLI-Agentic%20Ready-4f46e5?style=flat-square" alt="Agentic Ready" />
 </p>
 
 ---
 
 ## What is Sheaf?
 
-Sheaf is a privacy-first, ultra-fast PDF manipulation toolkit designed natively for macOS. It exists because manipulating PDFs shouldn't require uploading sensitive tax returns, contracts, or bank statements to third-party web services or subscribing to heavyweight suites.
+Sheaf is a privacy-first, ultra-fast PDF manipulation toolkit designed natively for macOS. It exists because working with PDFs shouldn't require uploading sensitive tax returns, contracts, or bank statements to third-party cloud services or subscribing to heavyweight suites.
 
-- **100% Offline:** Zero network calls, zero analytics, zero telemetry. Direct network crates are banned via cargo-deny in CI.
-- **Non-Destructive & Safe:** Input files are strictly read-only. Outputs are written atomically via scratch files to prevent corruption.
-- **Dual Interface:** High-performance automation CLI (`sheaf`) with a strict machine-readable JSON contract, and an elegant native macOS desktop application.
-- **Universal Binary:** Single native download for both Apple Silicon (M1/M2/M3/M4) and Intel Macs.
+Built from the ground up with a dual nature:
+1. **First-Class CLI for Agentic Workflows:** Purpose-built for AI agents (Claude Code, Cursor, Antigravity, LLM tool-calling), headless automation, and shell scripts with a strict machine-readable contract.
+2. **Fluid Desktop GUI:** A native macOS application with liquid glass vibrancy, drag-and-drop, interactive page thumbnail grids, and instant keyboard shortcuts (`⌘K`, `⌘O`, `⌘1`-`⌘8`).
+
+### Why Sheaf for AI Agents & Automation?
+
+- **Deterministic JSON Contract (`--json`):** When `--json` is specified, `stdout` yields exactly one valid JSON object (`"schema": 1`), both on success and failure. AI tools can parse output reliably without regex or string guessing.
+- **Strict Stream Separation:** `stdout` is reserved strictly for machine data. All human-readable logs, progress updates, and warnings stream to `stderr`. No console messages ever contaminate agent payloads.
+- **Dynamic Self-Introspection (`sheaf capabilities --json`):** Agents can inspect supported commands, arguments, types, defaults, and external dependencies (`qpdf`, `pdfium`) dynamically at runtime without trial-and-error or manual help scraping.
+- **Headless & Non-Interactive by Contract:** Sheaf never opens interactive prompts, prompts for confirmation, or blocks on unprovided flags. Missing arguments fail immediately with clear, structured error codes and actionable recovery hints.
+- **Safe Secret Handling:** Passwords are never passed as command-line arguments (preventing leaks via `ps` or shell history). They are ingested safely via environment variables, file paths, or stdin.
+- **Atomic File Operations:** All write operations write to temporary files in the target directory and rename them atomically. Original files are never modified in place, and interrupted agent runs never leave corrupted PDF fragments behind.
+- **Local Execution:** 100% of PDF processing happens locally on your machine with zero analytics and zero cloud uploads. Direct network dependencies are banned via CI linting.
 
 ---
 
