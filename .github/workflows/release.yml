@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,17 +20,17 @@ jobs:
     runs-on: macos-14
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: 20
           cache: npm
@@ -42,14 +43,26 @@ jobs:
       - name: Build Universal Release Artifacts
         run: ./scripts/build-universal.sh
 
-      - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v2
+      - name: Upload Build Artifacts (always)
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: sheaf-release-artifacts
+          path: |
+            dist/Sheaf-*-universal.dmg
+            dist/Sheaf-cli-*-universal.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Attest Build Provenance (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
           subject-path: |
             dist/Sheaf-*-universal.dmg
             dist/Sheaf-cli-*-universal.tar.gz
 
-      - name: Extract Release Notes from CHANGELOG.md
+      - name: Extract Release Notes from CHANGELOG.md (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
         id: notes
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -59,8 +72,9 @@ jobs:
             echo "Release ${GITHUB_REF_NAME}" > RELEASE_NOTES.md
           fi
 
-      - name: Create GitHub Draft Release
-        uses: softprops/action-gh-release@v2
+      - name: Create GitHub Draft Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
         with:
           draft: true
           prerelease: false
