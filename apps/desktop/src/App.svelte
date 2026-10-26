@@ -10,7 +10,6 @@
     ArrowUpDown,
     Lock,
     LockOpen,
-    Settings,
   } from '@lucide/svelte';
   import Sidebar from './lib/components/Sidebar.svelte';
   import DropZone from './lib/components/DropZone.svelte';
@@ -914,8 +913,8 @@
           {/if}
         </div>
 
-        <div class="titlebar-actions no-drag">
-          {#if hasWorkspaceInput}
+        {#if hasWorkspaceInput}
+          <div class="titlebar-actions no-drag">
             <button
               type="button"
               class="ghost-btn"
@@ -934,20 +933,8 @@
               <X size={14} strokeWidth={1.5} aria-hidden="true" />
               <span>{t.clearFiles}</span>
             </button>
-          {/if}
-          <button
-            type="button"
-            class="ghost-btn"
-            onclick={() => {
-              settingsDialogOpen = true;
-            }}
-            aria-label={t.settings}
-            title={t.settings}
-          >
-            <Settings size={14} strokeWidth={1.5} aria-hidden="true" />
-            <span>{t.settings}</span>
-          </button>
-        </div>
+          </div>
+        {/if}
       </header>
 
       {#if errorBanner}
