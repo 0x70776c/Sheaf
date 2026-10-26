@@ -606,3 +606,11 @@ This document lists third-party software components included or used in Sheaf, t
 | `lucide-svelte` | ISC | [lucide-icons/lucide](https://github.com/lucide-icons/lucide) |
 | `tailwindcss` | MIT | [tailwindlabs/tailwindcss](https://github.com/tailwindlabs/tailwindcss) |
 | `vite` | MIT | [vitejs/vite](https://github.com/vitejs/vite) |
+
+## Native Libraries (Bundled)
+
+### PDFium (Google / Chromium)
+- **License:** BSD-3-Clause (permissive)
+- **Source:** [Google PDFium](https://pdfium.googlesource.com/pdfium/) / [bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries)
+- **Terms:** Redistribution of binary forms is permitted provided that the copyright notice and conditions of the 3-Clause BSD license are retained.
+

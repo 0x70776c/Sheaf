@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/0x70776c/Sheaf/ci.yml?branch=main&label=CI&style=flat-square" alt="CI" /></a>
+  <a href="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml"><img src="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI Status" /></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-Universal-6366f1?style=flat-square" alt="macOS Universal" />
   <img src="https://img.shields.io/badge/CLI-Agentic%20Ready-4f46e5?style=flat-square" alt="Agentic Ready" />
