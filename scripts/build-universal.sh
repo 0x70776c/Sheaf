@@ -69,7 +69,7 @@ codesign --force --sign - --timestamp=none "$CLI_UNIVERSAL"
 echo "[3/7] Building universal Desktop app..."
 npm --prefix "$ROOT_DIR/apps/desktop" run build
 
-npx --prefix "$ROOT_DIR/apps/desktop" @tauri-apps/cli build --target universal-apple-darwin --bundles app --no-sign
+(cd "$ROOT_DIR/apps/desktop" && npx tauri build --target universal-apple-darwin --bundles app --no-sign)
 
 APP_SOURCE="$ROOT_DIR/target/universal-apple-darwin/release/bundle/macos/Sheaf.app"
 if [ ! -d "$APP_SOURCE" ]; then
@@ -89,6 +89,10 @@ echo "Ad-hoc signing Sheaf.app (inside-out)..."
 codesign --force --sign - --timestamp=none "$APP_STAGE/Contents/Frameworks/libpdfium.dylib"
 codesign --force --sign - --timestamp=none "$APP_STAGE/Contents/MacOS/sheaf-desktop"
 codesign --force --sign - --timestamp=none --deep "$APP_STAGE"
+
+# Also place clean Sheaf.app into dist/
+rm -rf "$DIST_DIR/Sheaf.app"
+(cd "$TMP_BUILD" && tar -cf - Sheaf.app) | (cd "$DIST_DIR" && tar -xf -)
 
 # 4. DMG erzeugen
 echo "[4/7] Creating universal DMG..."
