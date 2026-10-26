@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check, Globe, Moon, ShieldCheck, Sun, Monitor, X, ExternalLink } from '@lucide/svelte';
+  import { Check, Globe, Moon, Sun, Monitor, X, ExternalLink } from '@lucide/svelte';
   import type { Language } from '../i18n';
   import { translations } from '../i18n';
   import type { ThemePreference } from '../types';
@@ -178,11 +178,6 @@
                 <ExternalLink size={11} strokeWidth={2} />
               </button>
             </div>
-          </div>
-
-          <div class="guarantee-badge">
-            <ShieldCheck size={16} strokeWidth={2} class="badge-icon" />
-            <span>{t.noNetworkGuarantee}</span>
           </div>
 
           <p class="license-note">{t.licenseInfo}</p>
@@ -444,25 +439,6 @@
     padding: 1px 4px;
     background-color: var(--surface-hover);
     border-radius: 4px;
-  }
-
-  .guarantee-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: 11px;
-    color: #059669;
-    background-color: rgba(5, 150, 105, 0.1);
-    border: 1px solid rgba(5, 150, 105, 0.2);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-weight: 500;
-  }
-
-  :global([data-theme="dark"]) .guarantee-badge {
-    color: #34D399;
-    background-color: rgba(52, 211, 153, 0.12);
-    border-color: rgba(52, 211, 153, 0.25);
   }
 
   .license-note {

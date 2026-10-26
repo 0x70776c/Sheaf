@@ -4,7 +4,6 @@ export interface Translations {
   // App Header & Branding
   appName: string;
   appSubtitle: string;
-  offlineBadge: string;
   
   // Navigation & Actions
   switchTool: string;
@@ -104,14 +103,12 @@ export interface Translations {
   themeDark: string;
   aboutSheaf: string;
   licenseInfo: string;
-  noNetworkGuarantee: string;
 }
 
 export const translations: Record<Language, Translations> = {
   en: {
     appName: 'Sheaf',
-    appSubtitle: 'Fast, 100% offline PDF toolkit for macOS',
-    offlineBadge: '100% Offline',
+    appSubtitle: 'Fast, local PDF toolkit for macOS',
 
     switchTool: 'Switch tool...',
     settings: 'Settings',
@@ -205,12 +202,10 @@ export const translations: Record<Language, Translations> = {
     themeDark: 'Dark',
     aboutSheaf: 'About Sheaf',
     licenseInfo: 'Open source under MIT & Apache 2.0 licenses.',
-    noNetworkGuarantee: '100% offline. No telemetry, no accounts, no server uploads.',
   },
   de: {
     appName: 'Sheaf',
-    appSubtitle: 'Schnelles, 100 % offline PDF-Toolkit für macOS',
-    offlineBadge: '100 % Offline',
+    appSubtitle: 'Schnelles, lokales PDF-Toolkit für macOS',
 
     switchTool: 'Werkzeug wechseln…',
     settings: 'Einstellungen',
@@ -304,7 +299,6 @@ export const translations: Record<Language, Translations> = {
     themeDark: 'Dunkel',
     aboutSheaf: 'Über Sheaf',
     licenseInfo: 'Open Source unter MIT- und Apache 2.0-Lizenzen.',
-    noNetworkGuarantee: '100 % offline. Keine Telemetrie, keine Cloud-Uploads.',
   },
 };
 

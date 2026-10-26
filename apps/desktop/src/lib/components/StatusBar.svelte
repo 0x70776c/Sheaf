@@ -18,8 +18,8 @@
   let statusText = $derived.by(() => {
     if (files.length === 0) {
       return lang === 'de'
-        ? 'Keine Datei ausgewählt · 100 % Offline'
-        : 'No file selected · 100% Offline';
+        ? 'Keine Datei ausgewählt'
+        : 'No file selected';
     }
     if (files.length === 1) {
       const f = files[0];

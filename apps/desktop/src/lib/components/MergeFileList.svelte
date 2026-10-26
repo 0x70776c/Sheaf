@@ -135,8 +135,11 @@
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
     background-color: var(--surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
+    box-shadow: var(--shadow-glass);
   }
 
   .row-index {

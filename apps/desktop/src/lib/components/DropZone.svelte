@@ -106,10 +106,13 @@
     gap: var(--space-4);
     padding: var(--space-8);
     background-color: var(--surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     border: 1px dashed var(--border);
     border-radius: var(--radius-card);
     text-align: center;
     cursor: pointer;
+    box-shadow: var(--shadow-glass);
     transition:
       border-color var(--transition-fast),
       background-color var(--transition-fast),
@@ -118,6 +121,7 @@
 
   .dropzone-card:hover {
     border-color: var(--accent);
+    background-color: var(--surface-hover);
   }
 
   .dropzone-card.drag-over {
@@ -138,12 +142,15 @@
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-4);
-    background-color: var(--bg);
+    background-color: var(--surface-hover);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
     color: var(--text);
     font-weight: 500;
     cursor: pointer;
+    box-shadow: var(--glass-glow), 0 1px 3px rgba(0, 0, 0, 0.04);
     transition:
       border-color var(--transition-fast),
       background-color var(--transition-fast);

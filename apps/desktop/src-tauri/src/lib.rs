@@ -1263,6 +1263,24 @@ fn get_capabilities() -> CapabilitiesReport {
 pub fn run() {
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager as _;
+                use window_vibrancy::{
+                    NSVisualEffectMaterial, NSVisualEffectState, apply_vibrancy,
+                };
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = apply_vibrancy(
+                        &window,
+                        NSVisualEffectMaterial::UnderWindowBackground,
+                        Some(NSVisualEffectState::Active),
+                        Some(12.0),
+                    );
+                }
+            }
+            Ok(())
+        })
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             open_pdf,
