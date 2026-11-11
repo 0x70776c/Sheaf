@@ -132,6 +132,14 @@ pub(crate) fn get_pdfium() -> Result<&'static Pdfium, SheafError> {
 fn init_pdfium_bindings() -> Result<Pdfium, String> {
     let mut candidate_paths: Vec<PathBuf> = Vec::new();
 
+    let lib_name = if cfg!(target_os = "windows") {
+        "pdfium.dll"
+    } else if cfg!(target_os = "macos") {
+        "libpdfium.dylib"
+    } else {
+        "libpdfium.so"
+    };
+
     // 1. PDFIUM_LIB_PATH environment variable
     for env_key in ["PDFIUM_LIB_PATH", "PDFIUM_DYNAMIC_LIB_PATH"] {
         if let Some(val) = std::env::var_os(env_key) {
@@ -139,7 +147,7 @@ fn init_pdfium_bindings() -> Result<Pdfium, String> {
             if p.is_file() {
                 candidate_paths.push(p);
             } else if p.is_dir() {
-                candidate_paths.push(p.join("libpdfium.dylib"));
+                candidate_paths.push(p.join(lib_name));
             }
         }
     }
@@ -148,21 +156,22 @@ fn init_pdfium_bindings() -> Result<Pdfium, String> {
     if let Ok(exe_path) = std::env::current_exe()
         && let Some(exe_dir) = exe_path.parent()
     {
-        candidate_paths.push(exe_dir.join("libpdfium.dylib"));
-        candidate_paths.push(exe_dir.join("lib/libpdfium.dylib"));
-        candidate_paths.push(exe_dir.join("../lib/libpdfium.dylib"));
-        candidate_paths.push(exe_dir.join("../Frameworks/libpdfium.dylib"));
-        candidate_paths.push(exe_dir.join("../Resources/lib/libpdfium.dylib"));
+        candidate_paths.push(exe_dir.join(lib_name));
+        candidate_paths.push(exe_dir.join("lib").join(lib_name));
+        candidate_paths.push(exe_dir.join("../lib").join(lib_name));
+        candidate_paths.push(exe_dir.join("../Frameworks").join(lib_name));
+        candidate_paths.push(exe_dir.join("../Resources/lib").join(lib_name));
     }
 
     // 5. System paths and fallback
-    candidate_paths.push(PathBuf::from("/opt/homebrew/lib/libpdfium.dylib"));
-    candidate_paths.push(PathBuf::from("/usr/local/lib/libpdfium.dylib"));
-    candidate_paths.push(PathBuf::from("/usr/lib/libpdfium.dylib"));
-    candidate_paths.push(PathBuf::from("./libpdfium.dylib"));
-    candidate_paths.push(PathBuf::from("./vendor/pdfium/lib/libpdfium.dylib"));
+    candidate_paths.push(PathBuf::from("/usr/lib64").join(lib_name));
+    candidate_paths.push(PathBuf::from("/usr/local/lib").join(lib_name));
+    candidate_paths.push(PathBuf::from("/usr/lib").join(lib_name));
+    candidate_paths.push(PathBuf::from("/opt/homebrew/lib").join(lib_name));
+    candidate_paths.push(PathBuf::from(format!("./{lib_name}")));
+    candidate_paths.push(PathBuf::from(format!("./vendor/pdfium/lib/{lib_name}")));
     candidate_paths.push(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/pdfium/lib/libpdfium.dylib"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../vendor/pdfium/lib/{lib_name}")),
     );
 
     let mut probed: Vec<PathBuf> = Vec::new();
@@ -191,7 +200,7 @@ fn init_pdfium_bindings() -> Result<Pdfium, String> {
         .collect::<Vec<_>>()
         .join(", ");
     Err(format!(
-        "PDFium library (libpdfium.dylib) not found. Searched candidate locations: [{probe_list}]. Set PDFIUM_LIB_PATH or place libpdfium.dylib beside the executable, in ../lib/, or ../Frameworks/."
+        "PDFium library ({lib_name}) not found. Searched candidate locations: [{probe_list}]. Set PDFIUM_LIB_PATH or place {lib_name} beside the executable, in ../lib/, or ../Frameworks/."
     ))
 }
 

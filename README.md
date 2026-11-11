@@ -5,14 +5,15 @@
 <h1 align="center">Sheaf</h1>
 
 <p align="center">
-  <strong>Fast, local PDF toolkit for macOS — engineered for developers & agentic workflows</strong><br />
-  Apple Silicon (arm64) & Intel (x86_64) Universal
+  <strong>Fast, local PDF toolkit for macOS & Linux — engineered for developers & agentic workflows</strong><br />
+  macOS (Apple Silicon & Intel Universal) & Linux (CLI x86_64 / arm64)
 </p>
 
 <p align="center">
   <a href="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml"><img src="https://github.com/0x70776c/Sheaf/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI Status" /></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-Universal-6366f1?style=flat-square" alt="macOS Universal" />
+  <img src="https://img.shields.io/badge/Linux-CLI%20Supported-green?style=flat-square" alt="Linux CLI Supported" />
   <img src="https://img.shields.io/badge/CLI-Agentic%20Ready-4f46e5?style=flat-square" alt="Agentic Ready" />
 </p>
 
@@ -105,10 +106,35 @@ gh attestation verify Sheaf-0.1.0-universal.dmg --owner 0x70776c
 
 ### Prerequisites
 - **Rust** (stable toolchain, 1.85+ / Edition 2024): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- **Node.js** (v20+) & **npm**: `brew install node`
-- **qpdf** *(optional for deep verification)*: `brew install qpdf`
+- **Node.js** (v20+) & **npm** *(only for desktop GUI)*: `brew install node` (macOS) or distribution package manager (Linux)
+- **qpdf** *(optional for deep verification)*: `brew install qpdf` (macOS) or `dnf / apt install qpdf` (Linux)
 
-### Building Universal Binaries & Packages
+### Building the CLI on Linux
+
+```bash
+# 1. Clone repository
+git clone https://github.com/0x70776c/Sheaf.git
+cd Sheaf
+
+# 2. (Optional) Download PDFium binary for render & convert commands
+mkdir -p vendor/pdfium
+curl -sSL "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/8111/pdfium-linux-x64.tgz" | tar -xz -C vendor/pdfium
+
+# 3. Build optimized CLI release binary
+cargo build --release -p sheaf-cli
+
+# 4. Install binary and PDFium library to local PATH
+mkdir -p ~/.local/bin ~/.local/lib
+cp target/release/sheaf ~/.local/bin/
+cp vendor/pdfium/lib/libpdfium.so ~/.local/bin/
+cp vendor/pdfium/lib/libpdfium.so ~/.local/lib/
+
+# 5. Verify installation
+sheaf --version
+sheaf capabilities --json
+```
+
+### Building Universal Binaries & Packages on macOS
 ```bash
 # Clone the repository
 git clone https://github.com/0x70776c/Sheaf.git
