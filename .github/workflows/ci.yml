@@ -15,7 +15,7 @@ env:
 jobs:
   check:
     name: Lint & License Check
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
@@ -34,7 +34,7 @@ jobs:
 
   test-rust:
     name: Rust Tests & Smoke Tests
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
@@ -60,7 +60,7 @@ jobs:
 
   test-desktop:
     name: Desktop Frontend Build
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
@@ -77,7 +77,7 @@ jobs:
 
   verify-docs:
     name: Documentation Sync Check
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
